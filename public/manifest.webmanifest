@@ -1,0 +1,25 @@
+{
+  "id": "/",
+  "name": "ViraNexus AI",
+  "short_name": "ViraNexus",
+  "description": "AI-Powered Disease Outbreak Early Warning & Health Intelligence Platform - Predicting Outbreaks Before They Spread",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "theme_color": "#07090e",
+  "background_color": "#05070a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <defs>
+    <radialGradient id="bgGrad" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#1e1035"/>
+      <stop offset="50%" stop-color="#0c0a1a"/>
+      <stop offset="100%" stop-color="#05070a"/>
+    </radialGradient>
+    <linearGradient id="nexusGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4"/>
+      <stop offset="50%" stop-color="#8b5cf6"/>
+      <stop offset="100%" stop-color="#ec4899"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
+    </filter>
+  </defs>
+  <rect width="512" height="512" rx="128" fill="url(#bgGrad)"/>
+  <circle cx="256" cy="256" r="180" stroke="#8b5cf6" stroke-width="2" stroke-opacity="0.2" stroke-dasharray="8 8"/>
+  <circle cx="256" cy="256" r="130" stroke="#06b6d4" stroke-width="2" stroke-opacity="0.3"/>
+  <circle cx="256" cy="256" r="70" stroke="url(#nexusGrad)" stroke-width="6" filter="url(#glow)"/>
+  <!-- Orbiting nodes -->
+  <circle cx="256" cy="76" r="14" fill="#06b6d4" filter="url(#glow)"/>
+  <line x1="256" y1="90" x2="256" y2="186" stroke="#06b6d4" stroke-width="3" stroke-opacity="0.6"/>
+  <circle cx="256" cy="436" r="14" fill="#ec4899" filter="url(#glow)"/>
+  <line x1="256" y1="422" x2="256" y2="326" stroke="#ec4899" stroke-width="3" stroke-opacity="0.6"/>
+  <circle cx="76" cy="256" r="14" fill="#8b5cf6" filter="url(#glow)"/>
+  <line x1="90" y1="256" x2="186" y2="256" stroke="#8b5cf6" stroke-width="3" stroke-opacity="0.6"/>
+  <circle cx="436" cy="256" r="14" fill="#3b82f6" filter="url(#glow)"/>
+  <line x1="422" y1="256" x2="326" y2="256" stroke="#3b82f6" stroke-width="3" stroke-opacity="0.6"/>
+  <!-- Diagonal nodes -->
+  <circle cx="128" cy="128" r="10" fill="#06b6d4" filter="url(#glow)"/>
+  <line x1="135" y1="135" x2="206" y2="206" stroke="#06b6d4" stroke-width="2" stroke-opacity="0.5"/>
+  <circle cx="384" cy="128" r="10" fill="#8b5cf6" filter="url(#glow)"/>
+  <line x1="377" y1="135" x2="306" y2="206" stroke="#8b5cf6" stroke-width="2" stroke-opacity="0.5"/>
+  <circle cx="128" cy="384" r="10" fill="#8b5cf6" filter="url(#glow)"/>
+  <line x1="135" y1="377" x2="206" y2="306" stroke="#8b5cf6" stroke-width="2" stroke-opacity="0.5"/>
+  <circle cx="384" cy="384" r="10" fill="#ec4899" filter="url(#glow)"/>
+  <line x1="377" y1="377" x2="306" y2="306" stroke="#ec4899" stroke-width="2" stroke-opacity="0.5"/>
+  <!-- Core Pulse -->
+  <circle cx="256" cy="256" r="32" fill="url(#nexusGrad)"/>
+  <path d="M256 230 L263 248 L282 256 L263 264 L256 282 L249 264 L230 256 L249 248 Z" fill="#ffffff"/>
+</svg>

@@ -1,0 +1,6 @@
+{
+  "name": "ViraNexus AI",
+  "description": "AI-Powered Disease Outbreak Early Warning & Health Intelligence Platform - Predicting Outbreaks Before They Spread",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
