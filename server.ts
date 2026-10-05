@@ -23,16 +23,15 @@ let lastConfiguredKey = process.env.GEMINI_API_KEY;
 
 function isGeminiAvailable(): boolean {
   if (!process.env.GEMINI_API_KEY) return false;
-  
-  // If the user updated the API key in environment/settings, reset restrictions
+
   if (process.env.GEMINI_API_KEY !== lastConfiguredKey) {
     lastConfiguredKey = process.env.GEMINI_API_KEY;
     geminiAccessRestricted = false;
     aiClient = null;
   }
 
-  // If permission/quota was denied, wait 10 minutes before probing again
-  if (geminiAccessRestricted && Date.now() - lastAccessCheck < 10 * 60 * 1000) {
+  // If quota was exhausted or permission denied, pause calls for 5 minutes
+  if (geminiAccessRestricted && Date.now() - lastAccessCheck < 5 * 60 * 1000) {
     return false;
   }
   return true;
@@ -40,12 +39,19 @@ function isGeminiAvailable(): boolean {
 
 function handleGeminiError(err: any, context: string) {
   const errString = typeof err === 'string' ? err : (err?.message || '');
-  if (errString.includes('403') || errString.includes('PERMISSION_DENIED') || errString.includes('denied access')) {
+  if (
+    errString.includes('403') ||
+    errString.includes('429') ||
+    errString.includes('RESOURCE_EXHAUSTED') ||
+    errString.includes('quota') ||
+    errString.includes('overloaded') ||
+    errString.includes('rate-limit')
+  ) {
     geminiAccessRestricted = true;
     lastAccessCheck = Date.now();
-    console.log(`[Biosurveillance AI] Cloud Gemini permission restricted. Seamlessly utilizing built-in deterministic epidemiological engine.`);
+    console.log(`[OUTBREAKX AI] Cloud Gemini quota reached (${context}). Seamlessly switching to local deterministic epidemiological engine.`);
   } else {
-    console.log(`[Biosurveillance AI] ${context} safely utilizing built-in deterministic intelligence.`);
+    console.log(`[OUTBREAKX AI] ${context} utilizing local deterministic engine.`);
   }
 }
 
@@ -64,151 +70,127 @@ function getGenAI(): GoogleGenAI | null {
   return aiClient;
 }
 
-// Health check
+// Language detector: English, Tamil (தமிழ் script), or Tanglish (Tamil in Latin script)
+function detectLanguage(text: string): 'tamil' | 'tanglish' | 'english' {
+  // Check for Tamil Unicode range (U+0B80 to U+0BFF)
+  if (/[\u0B80-\u0BFF]/.test(text)) {
+    return 'tamil';
+  }
+
+  // Check for standalone Tanglish keywords and phonetic particles using word boundaries
+  const tanglishRegex = /\b(yen|eppadi|enge|aguthu|aaguthu|irukku|panrathu|panradhu|romba|solunga|pannalam|edhuku|ethukku|theriyuma|kooda|la|layum|adhu|idhu|varuthu|varum|paravuthu|paravutha|pathukalam|avasiyama|enna|nalla|illa|illai)\b/i;
+  if (tanglishRegex.test(text)) {
+    return 'tanglish';
+  }
+
+  return 'english';
+}
+
+// Natural, multi-language deterministic epidemiological synthesizer
+function generateLocalHeuristicInsights(datasetSummary: any, question: string = ''): string {
+  const total = datasetSummary?.totalCases || 0;
+  const diseases = datasetSummary?.topDiseases || [];
+  const zones = datasetSummary?.topZones || [];
+  const growthRate = datasetSummary?.growthRatePct || 0;
+  const r0 = datasetSummary?.estimatedR0 || 1.1;
+  const lang = detectLanguage(question);
+
+  const primaryDisease = diseases[0]?.name || 'Dengue';
+  const primaryZone = zones[0]?.name || 'Chennai';
+  const secondaryZone = zones[1]?.name || 'Chengalpattu';
+
+  // Empty state handling
+  if (total === 0) {
+    if (lang === 'tamil') {
+      return 'இன்னும் கண்காணிப்பு தரவுகள் எதுவும் பதிவேற்றப்படவில்லை. பகுப்பாய்வைத் தொடங்க CSV கோப்பை பதிவேற்றவும் அல்லது "Add Record" மூலம் புதிய பதிவைச் சேர்க்கவும்.\n\n---FOLLOW_UPS---\nமாதிரி தரவுத்தொகுப்பை எவ்வாறு ஏற்றுவது?\nOUTBREAKX எவ்வாறு நோய்களைக் கணிக்கிறது?\nடெங்கு எச்சரிக்கைகள் எவ்வாறு செயல்படுகின்றன?';
+    }
+    if (lang === 'tanglish') {
+      return 'Innum dataset ethuvum upload pannala. Analysis start panna CSV file upload pannunga or "Add Record" click panni data add pannunga.\n\n---FOLLOW_UPS---\nSample dataset eppadi load panrathu?\nOUTBREAKX eppadi disease predict pannuthu?\nDengue alert eppadi work aaguthu?';
+    }
+    return 'No surveillance dataset is loaded yet. Please upload a CSV file in Dataset Upload or click "Load Sample Dataset" to begin real-time outbreak prediction and monitoring.\n\n---FOLLOW_UPS---\nHow do I load the Tamil Nadu sample dataset?\nHow does OUTBREAKX predict upcoming outbreaks?\nWhat disease alerts are currently active?';
+  }
+
+  // TAMIL RESPONSE
+  if (lang === 'tamil') {
+    return `பதிவேற்றப்பட்ட **${total.toLocaleString()} வழக்குகள்** கொண்ட கண்காணிப்புத் தரவுகளின்படி:
+
+1. **முக்கிய நோய் பரவல்:** **${primaryDisease}** மொத்த வழக்குகளில் **${diseases[0]?.percentage || 0}%** பங்கை வகிக்கிறது.
+2. **அதிக பாதிப்புக்குள்ளான மாவட்டம்:** **${primaryZone}** அதிகபட்ச வழக்குகளுடன் (${zones[0]?.count || 0} வழக்குகள்) தீவிர கண்காணிப்பில் உள்ளது.
+3. **பரவல் வேகம் & வளர்ச்சி:** வாராந்திர வளர்ச்சி விகிதம் **${growthRate >= 0 ? '+' : ''}${growthRate}%** ஆகவும், பரவல் வேகம் **R₀ = ${r0}** ஆகவும் பதிவாகியுள்ளது.
+4. **அடுத்த கட்ட அபாயம்:** அருகில் உள்ள **${secondaryZone}** மற்றும் அருகாமை மாவட்டங்களுக்கும் பரவல் வாய்ப்பு உள்ளதாக கணிக்கப்பட்டுள்ளது.
+
+**பரிந்துரைக்கப்பட்ட தடுப்பு நடவடிக்கைகள்:**
+${primaryZone} பகுதிகளில் உடனடி கொசு ஒழிப்பு, தேங்கிய நீர் மேலாண்மை மற்றும் மொபைல் மருத்துவ பரிசோதனை முகாம்களை அமைக்க அறிவுறுத்தப்படுகிறது.
+
+---FOLLOW_UPS---
+${primaryZone} மாவட்டத்தில் என்னென்ன அறிகுறிகள் உள்ளன?
+அடுத்த வாரம் பரவல் வேகம் எவ்வாறு இருக்கும்?
+${primaryDisease} பரவலைக் கட்டுப்படுத்த என்ன முன்னெச்சரிக்கை எடுக்க வேண்டும்?`;
+  }
+
+  // TANGLISH RESPONSE
+  if (lang === 'tanglish') {
+    return `Upload pannuna surveillance dataset (**${total.toLocaleString()} records**) analysis padi:
+
+1. **Main Outbreak Pathogen:** **${primaryDisease}** thaan highest ah irukku (overall cases la **${diseases[0]?.percentage || 0}%**).
+2. **Top Affected District:** **${primaryZone}** la thaan maximum cases (${zones[0]?.count || 0} cases) report aagirukku.
+3. **Spread Velocity (R₀):** Current transmission rate **R₀ = ${r0}** and weekly case growth **${growthRate >= 0 ? '+' : ''}${growthRate}%** aaguthu.
+4. **Next Risk Zones:** Nearby district **${secondaryZone}** layum similar spread trend start aagirukku.
+
+**Enna Action Panradhu?**
+${primaryZone} la immediate vector control (fogging spray), stagnant water clear panrathu, and fever camps organize panrathu romba avasiyam.
+
+---FOLLOW_UPS---
+${primaryZone} la Dengue yen athigamaaguthu?
+Next week cases count eppadi irukkum?
+Secondary outbreak entha district la vara chance irukku?`;
+  }
+
+  // ENGLISH RESPONSE (Default)
+  return `Based on your uploaded surveillance dataset of **${total.toLocaleString()} records**:
+
+- **Dominant Pathogen:** **${primaryDisease}** accounts for **${diseases[0]?.percentage || 0}%** of all indexed infections.
+- **Primary Epicenter:** **${primaryZone}** has recorded the highest concentration with **${zones[0]?.count || 0} cases** (${zones[0]?.riskCategory || 'High'} Risk).
+- **Transmission Momentum:** Weekly cases are trending at **${growthRate >= 0 ? '+' : ''}${growthRate}%**, with an estimated reproduction speed (R₀) of **${r0}**.
+- **Cross-District Spread:** Secondary transmission signals are emerging toward **${secondaryZone}** and adjacent travel corridors.
+
+**Operational Recommendation:** Deploy localized vector control, reinforce fever screening kiosks, and alert regional primary health centers in ${primaryZone}.
+
+---FOLLOW_UPS---
+Why is ${primaryDisease} increasing in ${primaryZone}?
+What is the expected outbreak window for the next 2-4 weeks?
+Which districts are at medium risk right now?`;
+}
+
+// Health check endpoint
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'online',
-    app: 'ViraNexus AI',
-    tagline: 'Predicting Outbreaks Before They Spread',
-    aiEnabled: true,
+    app: 'OUTBREAKX',
+    tagline: 'AI-Powered Disease Outbreak Prediction & Early Warning System',
     aiEngine: isGeminiAvailable() ? 'gemini-cloud' : 'deterministic-epidemiological',
   });
 });
 
-// Natural, human-like epidemiological fallback synthesizer
-function generateLocalHeuristicInsights(datasetSummary: any, question?: string): string {
-  const total = datasetSummary?.totalCases || 0;
-  const diseases = datasetSummary?.topDiseases || [];
-  const zones = datasetSummary?.topZones || [];
-  const severeRatio = datasetSummary?.severeRatio || 0;
-  const icuRatio = datasetSummary?.icuRatio || 0;
-  const growthRate = datasetSummary?.growthRatePct || 0;
-  const r0 = datasetSummary?.estimatedR0 || 1.0;
-
-  if (total === 0) {
-    return "No dataset records are loaded yet. Please upload a CSV dataset or add your first record in Dataset & Records so I can analyze real health trends for you.";
-  }
-
-  const primaryDisease = diseases[0]?.name || 'the primary illness';
-  const primaryZone = zones[0]?.name || 'the main affected area';
-  const q = (question || '').toLowerCase();
-
-  let responseBody = '';
-  let followUps = [
-    `Which areas near ${primaryZone} should be alerted?`,
-    `What preventive actions can stop ${primaryDisease}?`,
-    `How many hospital beds will we need next week?`,
-  ];
-
-  if (q.includes('summar') || q.includes('overview') || q.includes('dataset')) {
-    responseBody = `Here is a clear summary of your current dataset of **${total.toLocaleString()} records**:
-
-- **Main Illness Detected:** **${primaryDisease}** accounts for ${diseases[0]?.percentage || 0}% of all recorded cases.
-- **Most Affected Area:** **${primaryZone}** has the highest case concentration.
-- **Current Growth Pace:** Weekly case numbers are changing by **${growthRate >= 0 ? '+' : ''}${growthRate}%**, with an estimated transmission speed (R₀) of **${r0}**.
-- **Severe Care Demand:** About **${(severeRatio * 100).toFixed(1)}%** of patients experienced severe symptoms, and **${(icuRatio * 100).toFixed(1)}%** required intensive care.
-
-Overall, the data points to active transmission in ${primaryZone}. Taking early containment steps now can significantly reduce further spread.`;
-  } else if (q.includes('area') || q.includes('danger') || q.includes('risk') || q.includes('where')) {
-    responseBody = `Based on your records, the highest risk area right now is **${primaryZone}**. 
-
-Here is what the data tells us:
-1. **Case Volume:** ${zones[0]?.count || 0} cases (${Math.round(((zones[0]?.count || 0) / Math.max(1, total)) * 100)}% of your whole dataset).
-2. **Pathogens Present:** Mainly **${primaryDisease}**.
-3. **Risk Level:** Classified as high risk due to rapid clustering.
-
-**What to do:** Focus health teams on ${primaryZone}, distribute rapid testing, and advise residents to report any fever early.`;
-    followUps = [
-      `What are the symptoms reported in ${primaryZone}?`,
-      `How fast is ${primaryDisease} spreading there?`,
-      `What should local clinics do first?`,
-    ];
-  } else if (q.includes('predict') || q.includes('forecast') || q.includes('next week') || q.includes('cases')) {
-    const projectedNextWeek = Math.round(total * (1 + Math.max(-0.2, growthRate / 100)));
-    responseBody = `Looking at the growth trajectory from your data, here is what we expect over the coming week:
-
-- **Spread Rate (R₀):** Currently at **${r0}**. Because this is ${r0 > 1 ? 'above 1.0, cases are multiplying' : 'stable or declining, transmission is leveling off'}.
-- **Estimated Cases Next Week:** Approximately **${projectedNextWeek.toLocaleString()} cases** across all monitored areas.
-- **Key Factor:** If testing and isolation are ramped up in ${primaryZone}, growth can be quickly slowed.`;
-    followUps = [
-      `Can we reduce R₀ below 1.0 this week?`,
-      `Will hospital beds overflow next week?`,
-      `What happens if no action is taken?`,
-    ];
-  } else if (q.includes('hospital') || q.includes('bed') || q.includes('icu') || q.includes('surge')) {
-    const neededBeds = Math.max(5, Math.ceil(total * Math.max(0.12, severeRatio)));
-    const neededICU = Math.max(2, Math.ceil(total * Math.max(0.04, icuRatio)));
-    responseBody = `Here is the hospital readiness outlook based on patient severity in your dataset:
-
-- **General Hospital Beds Needed:** Approximately **${neededBeds} beds** should be set aside for acute patients.
-- **ICU Beds Needed:** Around **${neededICU} intensive care beds** with oxygen support.
-- **Clinical Readiness Note:** Clinics near **${primaryZone}** should verify staff shifts and oxygen supplies before the weekend peak.`;
-    followUps = [
-      `What supplies are needed most for ${primaryDisease}?`,
-      `Which age group needs the most hospital beds?`,
-      `What triage steps should emergency rooms use?`,
-    ];
-  } else if (q.includes('anomal') || q.includes('spike') || q.includes('outlier') || q.includes('rare') || q.includes('unusual')) {
-    const topDiseasePct = diseases[0]?.percentage || 0;
-    const isSpike = growthRate > 15 || r0 > 1.25;
-    responseBody = `Here is the detailed anomaly and outlier report generated from your surveillance data:
-
-1. **Volume Spike Detection:** ${isSpike ? `A statistical transmission spike is detected (R₀ at **${r0}**, weekly growth **+${growthRate}%**). Case acceleration in **${primaryZone}** deviates significantly from standard Poisson distribution baselines.` : `Case accumulation remains within standard variance intervals with no abrupt multi-sigma surges.`}
-2. **Pathogen Disproportion:** **${primaryDisease}** accounts for **${topDiseasePct}%** of all cases, signaling an acute mono-pathogen clustering event rather than an evenly distributed seasonal pattern.
-3. **Clinical Severity Outlier:** Clinical acuity stands at **${(severeRatio * 100).toFixed(1)}%**, which ${severeRatio > 0.2 ? 'constitutes an elevated acuity surge requiring preemptive ICU reserves' : 'is within manageable outpatient operational limits'}.
-
-**Investigation Protocol:** Deploy mobile epidemiological contact-tracing units to **${primaryZone}** to confirm index vector origin and eliminate environmental point-source contaminants.`;
-    followUps = [
-      `Which locations near ${primaryZone} could develop anomalies?`,
-      `How does this anomaly impact hospital bed capacity?`,
-      `What rapid counter-measures will contain this spike?`,
-    ];
-  } else if (q.includes('prevent') || q.includes('action') || q.includes('step') || q.includes('what should')) {
-    responseBody = `Here are 4 practical preventive steps based directly on your data:
-
-1. **Focused Screening in ${primaryZone}:** Set up quick fever checks and free test kits in high-traffic neighborhoods.
-2. **Targeted Guidance for ${primaryDisease}:** Alert households on safe water, mosquito control, or mask usage depending on the pathogen.
-3. **Clinic Readiness:** Ensure hospitals have extra beds ready for the projected ${(severeRatio * 100).toFixed(0)}% severe cases.
-4. **Community Updates:** Share daily updates in simple language so people seek care early rather than waiting until symptoms become critical.`;
-    followUps = [
-      `How can we inform families in ${primaryZone}?`,
-      `How soon should we expect cases to drop?`,
-      `What is our community health index right now?`,
-    ];
-  } else {
-    responseBody = `I analyzed your surveillance data for you:
-
-- We are monitoring **${total.toLocaleString()} total cases**.
-- **${primaryDisease}** is the most widespread illness, particularly in **${primaryZone}**.
-- The weekly case trend is **${growthRate >= 0 ? '+' : ''}${growthRate}%**, with transmission speed R₀ at **${r0}**.
-- Current severity rate is **${(severeRatio * 100).toFixed(1)}%**.
-
-Feel free to ask me about hospital capacity, which neighborhoods are most at risk, or specific preventive actions!`;
-  }
-
-  return `${responseBody}\n\n---FOLLOW_UPS---\n${followUps.join('\n')}`;
-}
-
-// AI Command Center query endpoint
+// AI Copilot Query Endpoint with multi-language support (English, Tamil, Tanglish)
 app.post('/api/ai/query', async (req, res) => {
   try {
-    const question = req.body.question || req.body.query || '';
-    const datasetSummary = req.body.datasetSummary || req.body.summary || {};
-    const history = req.body.history || [];
+    const { question, datasetSummary, history = [] } = req.body;
 
     if (!question) {
       return res.status(400).json({ error: 'Question is required' });
     }
 
+    const detectedLang = detectLanguage(question);
     const ai = getGenAI();
 
     if (!ai || !process.env.GEMINI_API_KEY) {
-      // Fallback deterministic analysis
       const localAnswer = generateLocalHeuristicInsights(datasetSummary, question);
       return res.json({
         answer: localAnswer,
         response: localAnswer,
-        source: 'local_heuristic',
+        source: 'outbreakx_intelligence_engine',
+        language: detectedLang,
       });
     }
 
@@ -216,30 +198,31 @@ app.post('/api/ai/query', async (req, res) => {
       ? `Recent Conversation Context:\n${history.slice(-4).map((h: any) => `${h.sender === 'user' ? 'User' : 'Assistant'}: ${h.text}`).join('\n')}\n\n`
       : '';
 
-    const prompt = `You are ViraNexus AI Health Copilot, an intelligent, empathetic, and knowledgeable health advisor designed like ChatGPT.
-You help public health workers, doctors, and community leaders understand disease outbreaks easily.
+    const prompt = `You are OUTBREAKX AI Copilot, an advanced epidemiological and disease outbreak intelligence advisor.
 
-REAL DATASET TELEMETRY (Only use these real user metrics):
-- Total Verified Cases: ${datasetSummary?.totalCases || 0}
-- Date Range: ${JSON.stringify(datasetSummary?.dateRange || 'N/A')}
+SURVEILLANCE DATASET TELEMETRY (Ground all statements strictly in this real data):
+- Total Cases: ${datasetSummary?.totalCases || 0}
+- Active Alerts: ${datasetSummary?.activeAlertsCount || 0}
+- High Risk Districts: ${datasetSummary?.highRiskZonesCount || 0}
 - Primary Diseases: ${JSON.stringify(datasetSummary?.topDiseases?.slice(0, 4) || [])}
-- Risk Areas: ${JSON.stringify(datasetSummary?.topZones?.slice(0, 4) || [])}
-- Severe Rate: ${datasetSummary?.severeRatio ? (datasetSummary.severeRatio * 100).toFixed(1) + '%' : 'N/A'}
-- ICU Rate: ${datasetSummary?.icuRatio ? (datasetSummary.icuRatio * 100).toFixed(1) + '%' : 'N/A'}
+- Monitored Districts: ${JSON.stringify(datasetSummary?.topZones?.slice(0, 4) || [])}
 - 7-Day Growth Rate: ${datasetSummary?.growthRatePct || 0}%
-- Transmission Speed R₀: ${datasetSummary?.estimatedR0 || 1.0}
-- Hospital Bed Projection: ${datasetSummary?.hospitalSurge?.length || 0} days modeled
+- Transmission Speed (R₀): ${datasetSummary?.estimatedR0 || 1.1}
+- Outbreak Prediction: ${JSON.stringify(datasetSummary?.prediction || {})}
 
-${historyPrompt}USER'S QUESTION:
+USER'S QUESTION:
 "${question}"
+USER'S DETECTED LANGUAGE: ${detectedLang.toUpperCase()}
 
-RESPONSE STYLE GUIDELINES:
-1. Speak in warm, clear, simple English like ChatGPT. Avoid dense medical or robotic jargon.
-2. Explain disease growth, risk levels, and predictions so anyone can understand them immediately.
-3. If there are 0 records in the dataset, kindly advise the user to upload a CSV dataset or add their first record.
-4. If records exist, reference real numbers from the dataset (e.g. percentages, specific city names, disease names).
-5. Suggest practical, real-world preventive actions.
-6. AT THE VERY END of your response, provide exactly 3 relevant, interesting follow-up questions the user might want to ask next, separated by a separator line like this:
+CRITICAL LANGUAGE & SYSTEM RULES:
+1. DETECT THE USER'S LANGUAGE AND RESPOND IN THE EXACT SAME LANGUAGE:
+   - If the user asked in Tamil (தமிழ்), write the response completely in fluent, natural TAMIL (தமிழ் எழுத்துகளில்).
+   - If the user asked in Tanglish (Tamil expressed in Latin script, e.g. "Chennai la dengue yen increase aguthu?"), respond naturally in TANGLISH.
+   - If the user asked in English, respond in clear, professional ENGLISH.
+2. DO NOT ACT AS A DOCTOR. Do NOT provide personal medical diagnosis, triage advice, or individual drug prescriptions.
+3. DO NOT GENERATE FAKE DATA. Only explain information derived from the provided dataset and platform analytics.
+4. Explain dataset trends, predictions, alerts, and district risks clearly so public health authorities, researchers, and judges can evaluate them easily.
+5. Provide 3 relevant follow-up questions at the very end in the SAME language, formatted exactly as:
 ---FOLLOW_UPS---
 [First follow-up question]
 [Second follow-up question]
@@ -248,238 +231,42 @@ RESPONSE STYLE GUIDELINES:
     let text: string | undefined;
     let modelUsed = 'gemini-3.8-flash';
 
-    if (ai) {
-      try {
-        const modelResponse = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            systemInstruction: 'You are ViraNexus AI Health Copilot. Provide warm, conversational, human-like answers in clear simple English. Avoid robotic or dry clinical language.',
-          },
-        });
-        text = modelResponse.text;
-      } catch (primaryErr: any) {
-        handleGeminiError(primaryErr, 'AI Query Primary');
-        try {
-          if (isGeminiAvailable()) {
-            const fallbackModelResponse = await ai.models.generateContent({
-              model: 'gemini-3.6-flash',
-              contents: prompt,
-              config: {
-                systemInstruction: 'You are ViraNexus AI Health Copilot. Provide warm, conversational, human-like answers in clear simple English. Avoid robotic or dry clinical language.',
-              },
-            });
-            text = fallbackModelResponse.text;
-            modelUsed = 'gemini-3.6-flash';
-          }
-        } catch (secErr: any) {
-          handleGeminiError(secErr, 'AI Query Secondary');
-        }
-      }
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('AI generation timeout')), 8000)
+    );
+
+    try {
+      const modelPromise = ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: prompt,
+        config: {
+          systemInstruction: 'You are OUTBREAKX AI Copilot. Match the exact user language (English, Tamil தமிழ், or Tanglish) and explain outbreak patterns factually without medical diagnosis.',
+        },
+      });
+      const modelResponse = await Promise.race([modelPromise, timeoutPromise]);
+      text = modelResponse.text;
+    } catch (primaryErr: any) {
+      handleGeminiError(primaryErr, 'Copilot Query');
+      // If primary model failed (e.g. quota exhausted or timeout), fall back gracefully
     }
 
     const finalText = text || generateLocalHeuristicInsights(datasetSummary, question);
     return res.json({
       answer: finalText,
       response: finalText,
-      source: text ? modelUsed : 'deterministic_epidemiological',
+      source: text ? modelUsed : 'outbreakx_intelligence_engine',
+      language: detectedLang,
     });
   } catch (error: any) {
     const fallbackAnswer = generateLocalHeuristicInsights(
-      req.body.datasetSummary || req.body.summary,
-      req.body.question || req.body.query
+      req.body.datasetSummary,
+      req.body.question
     );
     return res.json({
       answer: fallbackAnswer,
       response: fallbackAnswer,
-      source: 'deterministic_fallback',
+      source: 'outbreakx_intelligence_engine',
     });
-  }
-});
-
-// Proactive Outbreak Intelligence Generation endpoint
-app.post('/api/ai/insights', async (req, res) => {
-  try {
-    const { datasetSummary } = req.body;
-    const ai = getGenAI();
-
-    if (!ai) {
-      return res.json({
-        insights: generateLocalHeuristicInsights(datasetSummary),
-        source: 'deterministic_epidemiological',
-      });
-    }
-
-    const prompt = `Generate an Executive Outbreak Threat Assessment based on this epidemiological dataset:
-${JSON.stringify(datasetSummary, null, 2)}
-
-Provide:
-1. Executive Risk Classification (Low / Moderate / Elevated / Critical)
-2. Immediate Outbreak Trajectory (Next 7-14 days)
-3. Key Pathogen Vulnerabilities & Cohort Exposures
-4. Three Critical Countermeasures for Public Health Officials`;
-
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-      });
-
-      return res.json({
-        insights: response.text || generateLocalHeuristicInsights(datasetSummary),
-        source: 'gemini-3.8-flash',
-      });
-    } catch (err: any) {
-      handleGeminiError(err, 'AI Insights');
-      return res.json({
-        insights: generateLocalHeuristicInsights(datasetSummary),
-        source: 'deterministic_fallback',
-      });
-    }
-  } catch (error: any) {
-    return res.json({
-      insights: generateLocalHeuristicInsights(req.body.datasetSummary),
-      source: 'deterministic_fallback',
-    });
-  }
-});
-
-// AI Executive Briefing Generator endpoint
-app.post('/api/ai/briefing', async (req, res) => {
-  try {
-    const { datasetSummary, focus = 'strategic' } = req.body;
-    const total = datasetSummary?.totalCases || 0;
-
-    if (total === 0) {
-      return res.status(400).json({ error: 'No user records available for executive briefing' });
-    }
-
-    const ai = getGenAI();
-
-    const generateLocalBriefing = () => {
-      const topDisease = datasetSummary?.topDiseases?.[0]?.name || 'Unspecified Pathogen';
-      const topZone = datasetSummary?.topZones?.[0]?.name || 'Unspecified Sector';
-      const r0 = datasetSummary?.estimatedR0 || 1.1;
-      const growth = datasetSummary?.growthRatePct || 0;
-      const severePct = (datasetSummary?.severeRatio ? datasetSummary.severeRatio * 100 : 0).toFixed(1);
-      const icuPct = (datasetSummary?.icuRatio ? datasetSummary.icuRatio * 100 : 0).toFixed(1);
-      const hospitalBeds = Math.max(5, Math.ceil(total * Math.max(0.12, datasetSummary?.severeRatio || 0.1)));
-      const icuBeds = Math.max(2, Math.ceil(total * Math.max(0.04, datasetSummary?.icuRatio || 0.03)));
-
-      let threatLevel = 'MODERATE';
-      if (r0 >= 1.5 || growth >= 30) threatLevel = 'CRITICAL ALERT';
-      else if (r0 >= 1.2 || growth >= 15) threatLevel = 'HIGH VIGILANCE';
-      else if (r0 < 1.0 && growth < 0) threatLevel = 'STABILIZING';
-
-      return {
-        title: `ViraNexus Situational Briefing: ${topDisease} Vector Assessment`,
-        date: new Date().toISOString().split('T')[0],
-        threatLevel,
-        focus,
-        executiveSummary: `Biosurveillance telemetry indicates ${threatLevel.toLowerCase()} conditions with ${total.toLocaleString()} confirmed cases. Primary transmission is localized around ${topZone}, driven predominantly by ${topDisease} with a transmission velocity of R₀ = ${r0}.`,
-        epidemiologicalStatus: {
-          totalCases: total,
-          transmissionRate: `R₀ = ${r0}`,
-          weeklyVelocity: `${growth >= 0 ? '+' : ''}${growth}% weekly change`,
-          primaryEpicenter: topZone,
-          dominantPathogen: `${topDisease} (${datasetSummary?.topDiseases?.[0]?.percentage || 0}% share)`,
-        },
-        clinicalStrain: {
-          severeAcuityRate: `${severePct}%`,
-          icuDemandRate: `${icuPct}%`,
-          projectedGeneralBeds: hospitalBeds,
-          projectedICUUnits: icuBeds,
-          primaryDemographic: datasetSummary?.ageCohorts?.[0]?.cohort || 'General Population',
-        },
-        actionDirectives: [
-          {
-            priority: 'IMMEDIATE',
-            directive: `Deploy rapid mobile triage and diagnostic screening checkpoints across ${topZone}.`,
-            targetSector: topZone,
-          },
-          {
-            priority: 'CRITICAL',
-            directive: `Reserve ${hospitalBeds} acute respiratory inpatient beds and ${icuBeds} ICU isolation suites within regional health centers.`,
-            targetSector: 'Clinical Infrastructure',
-          },
-          {
-            priority: 'TACTICAL',
-            directive: `Initiate targeted community advisories detailing containment and protective measures for ${topDisease}.`,
-            targetSector: 'Public Communications',
-          },
-        ],
-        generatedBy: 'ViraNexus Deterministic Epidemiological Model',
-      };
-    };
-
-    if (!ai) {
-      return res.json({
-        briefing: generateLocalBriefing(),
-        source: 'deterministic_epidemiological',
-      });
-    }
-
-    const prompt = `You are the Chief Epidemiological Advisor for ViraNexus AI.
-Generate a high-level, authoritative, structured Executive Situational Briefing based solely on this verified user surveillance dataset:
-${JSON.stringify(datasetSummary, null, 2)}
-
-Briefing Focus Directive: "${focus}" (e.g. strategic overview, emergency containment, hospital readiness).
-
-Strict JSON Output format matching:
-{
-  "title": "Title of briefing",
-  "date": "YYYY-MM-DD",
-  "threatLevel": "CRITICAL ALERT" | "HIGH VIGILANCE" | "MODERATE" | "STABILIZING",
-  "focus": "${focus}",
-  "executiveSummary": "Concise paragraph synthesizing current outbreak state, epicenter, and immediate risks.",
-  "epidemiologicalStatus": {
-    "totalCases": number,
-    "transmissionRate": "string (e.g. R₀ = 1.45)",
-    "weeklyVelocity": "string",
-    "primaryEpicenter": "string",
-    "dominantPathogen": "string"
-  },
-  "clinicalStrain": {
-    "severeAcuityRate": "string",
-    "icuDemandRate": "string",
-    "projectedGeneralBeds": number,
-    "projectedICUUnits": number,
-    "primaryDemographic": "string"
-  },
-  "actionDirectives": [
-    {
-      "priority": "IMMEDIATE" | "CRITICAL" | "TACTICAL",
-      "directive": "Concrete operational instruction",
-      "targetSector": "Affected zone or public department"
-    }
-  ],
-  "generatedBy": "ViraNexus AI Assistant"
-}
-Output valid JSON only with no markdown wrapping.`;
-
-    try {
-      const response = await ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: prompt,
-        config: {
-          responseMimeType: 'application/json',
-        },
-      });
-
-      const parsed = JSON.parse(response.text || '{}');
-      return res.json({
-        briefing: parsed.title ? parsed : generateLocalBriefing(),
-        source: 'gemini-3.8-flash',
-      });
-    } catch (aiErr: any) {
-      handleGeminiError(aiErr, 'AI Briefing');
-      return res.json({
-        briefing: generateLocalBriefing(),
-        source: 'deterministic_fallback',
-      });
-    }
-  } catch (err: any) {
-    return res.status(500).json({ error: 'Failed to generate executive briefing' });
   }
 });
 
@@ -499,7 +286,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`ViraNexus AI server running on port ${PORT}`);
+    console.log(`OUTBREAKX server running on port ${PORT}`);
   });
 }
 

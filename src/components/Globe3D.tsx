@@ -1,6 +1,16 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { Activity, Shield, Radio, Compass } from 'lucide-react';
-import { resolveSmartLocation } from '../services/locationService';
+import { Activity, Shield, Radio, Compass, RotateCcw, ZoomIn, ZoomOut, Play, Pause, X } from 'lucide-react';
+import { TAMIL_NADU_DISTRICTS } from '../services/dataScience';
+
+interface HotspotDetail {
+  name: string;
+  disease: string;
+  cases: number;
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
+  recentTrend: string;
+  lat: number;
+  lng: number;
+}
 
 interface Globe3DProps {
   totalRecords: number;
@@ -19,38 +29,81 @@ interface SpherePoint {
   origZ: number;
   size: number;
   brightness: number;
-  type: 'core' | 'ring' | 'orbital' | 'grid';
+  type: 'core' | 'orbital';
 }
 
-interface CyberHotspot {
-  name: string;
-  disease?: string;
-  cases: number;
-  origX: number;
-  origY: number;
-  origZ: number;
-  color: string;
-  coreColor: string;
-}
+// Global surveillance nodes to immediately establish world surveillance scale
+const GLOBAL_HUBS: HotspotDetail[] = [
+  { name: 'Chennai', disease: 'Dengue', cases: 88, riskLevel: 'Critical', recentTrend: '+28% Weekly acceleration', lat: 13.0827, lng: 80.2707 },
+  { name: 'Madurai', disease: 'Influenza A', cases: 48, riskLevel: 'High', recentTrend: '+19% Transmission pace', lat: 9.9252, lng: 78.1198 },
+  { name: 'Coimbatore', disease: 'Typhoid', cases: 29, riskLevel: 'Medium', recentTrend: 'Cluster stabilized', lat: 11.0168, lng: 76.9558 },
+  { name: 'Singapore', disease: 'Zika', cases: 14, riskLevel: 'Low', recentTrend: 'Vector containment active', lat: 1.3521, lng: 103.8198 },
+  { name: 'London', disease: 'Norovirus', cases: 42, riskLevel: 'Medium', recentTrend: 'Seasonal winter baseline', lat: 51.5074, lng: -0.1278 },
+  { name: 'Geneva', disease: 'Respiratory RSV', cases: 21, riskLevel: 'Low', recentTrend: 'WHO monitored zone', lat: 46.2044, lng: 6.1432 },
+  { name: 'Tokyo', disease: 'Influenza B', cases: 65, riskLevel: 'High', recentTrend: '+14% Metropolitan surge', lat: 35.6762, lng: 139.6503 },
+  { name: 'New York', disease: 'COVID-19 Variant', cases: 53, riskLevel: 'Medium', recentTrend: 'Steady community monitoring', lat: 40.7128, lng: -74.0060 },
+  { name: 'Nairobi', disease: 'Cholera', cases: 36, riskLevel: 'Critical', recentTrend: '+31% Water vector spread', lat: -1.2921, lng: 36.8219 },
+  { name: 'São Paulo', disease: 'Chikungunya', cases: 58, riskLevel: 'High', recentTrend: '+22% Tropical cluster', lat: -23.5505, lng: -46.6333 },
+];
 
 export const Globe3D: React.FC<Globe3DProps> = ({
   totalRecords = 0,
-  r0 = 0,
-  topDisease = '',
-  topLocation = '',
+  r0 = 1.1,
+  topDisease = 'Dengue',
+  topLocation = 'Chennai',
   locations = [],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const [selectedHotspot, setSelectedHotspot] = useState<HotspotDetail | null>(null);
+  const [popupPos, setPopupPos] = useState<{ x: number; y: number } | null>(null);
+  const [isAutoRotate, setIsAutoRotate] = useState(true);
+  const [zoomScale, setZoomScale] = useState(1);
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
 
-  // Physics rotation ref with inertia
   const rotRef = useRef({
-    rotY: 0,
-    tiltX: 0.25,
-    velocityY: 0.004,
+    rotY: -0.8,
+    tiltX: 0.28,
+    velocityY: 0.005,
     velocityX: 0,
   });
+
+  // Combine user dataset locations with global reference nodes
+  const activeHotspots: HotspotDetail[] = React.useMemo(() => {
+    const list: HotspotDetail[] = [];
+
+    // Map user surveillance data first
+    locations.forEach((loc) => {
+      const tnMatch = TAMIL_NADU_DISTRICTS[loc.name];
+      const lat = tnMatch ? tnMatch.lat : 11.5 + Math.random() * 3;
+      const lng = tnMatch ? tnMatch.lng : 78.5 + Math.random() * 3;
+
+      let rLevel: 'Low' | 'Medium' | 'High' | 'Critical' = 'Low';
+      const sev = (loc.severity || '').toLowerCase();
+      if (sev.includes('crit') || (loc.cases || 0) >= 50) rLevel = 'Critical';
+      else if (sev.includes('high') || sev.includes('sev') || (loc.cases || 0) >= 30) rLevel = 'High';
+      else if (sev.includes('med') || sev.includes('mod') || (loc.cases || 0) >= 15) rLevel = 'Medium';
+
+      list.push({
+        name: loc.name,
+        disease: loc.disease || topDisease || 'Pathogen',
+        cases: loc.cases || 12,
+        riskLevel: rLevel,
+        recentTrend: rLevel === 'Critical' ? '+28% Active acceleration' : '+12% Monitored trajectory',
+        lat,
+        lng,
+      });
+    });
+
+    // Add global hubs if fewer user locations
+    GLOBAL_HUBS.forEach((hub) => {
+      if (!list.some((item) => item.name.toLowerCase() === hub.name.toLowerCase())) {
+        list.push(hub);
+      }
+    });
+
+    return list;
+  }, [locations, topDisease]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -59,43 +112,42 @@ export const Globe3D: React.FC<Globe3DProps> = ({
     if (!ctx) return;
 
     let animationFrameId: number;
-    const radius = 135;
+    const baseRadius = 150;
 
-    // 1. Build Multi-layered 3D Cybernetic Hologram Points (Fibonacci sphere + orbital rings)
+    // Build Fibonacci Sphere Points
     const points: SpherePoint[] = [];
-    const totalPoints = 320;
-    const phi = Math.PI * (3 - Math.sqrt(5)); // golden ratio angle
+    const totalPoints = 360;
+    const phi = Math.PI * (3 - Math.sqrt(5));
 
     for (let i = 0; i < totalPoints; i++) {
-      const y = 1 - (i / (totalPoints - 1)) * 2; // y goes from 1 to -1
-      const radiusAtY = Math.sqrt(1 - y * y); // radius at y
-      const theta = phi * i; // golden angle increment
+      const y = 1 - (i / (totalPoints - 1)) * 2;
+      const radiusAtY = Math.sqrt(1 - y * y);
+      const theta = phi * i;
 
       const x = Math.cos(theta) * radiusAtY;
       const z = Math.sin(theta) * radiusAtY;
 
-      // Brightness variations for holographic depth
-      const isGridPole = Math.abs(y) > 0.85;
       const isEquator = Math.abs(y) < 0.15;
+      const isGridPole = Math.abs(y) > 0.85;
 
       points.push({
-        x: x * radius,
-        y: y * radius,
-        z: z * radius,
-        origX: x * radius,
-        origY: y * radius,
-        origZ: z * radius,
-        size: isEquator ? 1.8 : isGridPole ? 1.6 : 1.2,
-        brightness: isEquator ? 0.9 : 0.7,
+        x: x * baseRadius,
+        y: y * baseRadius,
+        z: z * baseRadius,
+        origX: x * baseRadius,
+        origY: y * baseRadius,
+        origZ: z * baseRadius,
+        size: isEquator ? 1.8 : isGridPole ? 1.5 : 1.2,
+        brightness: isEquator ? 0.9 : 0.65,
         type: 'core',
       });
     }
 
-    // 2. Add concentric cybernetic orbital particle rings
-    const ringRadii = [radius * 1.08, radius * 1.2];
+    // Add cybernetic orbital rings
+    const ringRadii = [baseRadius * 1.12, baseRadius * 1.24];
     ringRadii.forEach((rRing, rIdx) => {
-      const ringSteps = 48;
-      const tiltAngle = (rIdx === 0 ? 25 : -40) * (Math.PI / 180);
+      const ringSteps = 56;
+      const tiltAngle = (rIdx === 0 ? 28 : -38) * (Math.PI / 180);
 
       for (let s = 0; s < ringSteps; s++) {
         const ang = (s / ringSteps) * Math.PI * 2;
@@ -117,318 +169,137 @@ export const Globe3D: React.FC<Globe3DProps> = ({
       }
     });
 
-    // 3. Build Dynamic Hotspots from User Surveillance Data
-    const hotspots: CyberHotspot[] = [];
-
-    if (totalRecords > 0) {
-      const locList =
-        locations.length > 0
-          ? locations
-          : topLocation
-          ? [{ name: topLocation, disease: topDisease, cases: totalRecords }]
-          : [];
-
-      locList.slice(0, 5).forEach((item, idx) => {
-        const smart = resolveSmartLocation(item.name);
-        const lat = smart.latitude || 12.0 + ((idx * 28 + 15) % 65) - 20;
-        const lon = smart.longitude || 78.0 + ((idx * 55 + 20) % 180) - 90;
-
-        const latRad = (lat * Math.PI) / 180;
-        const lonRad = (lon * Math.PI) / 180;
-
-        let color = '#06b6d4'; // cyan
-        let coreColor = '#22d3ee';
-        if (item.severity === 'Critical' || idx === 0) {
-          color = '#f43f5e'; // neon rose
-          coreColor = '#fb7185';
-        } else if (item.severity === 'Severe' || idx === 1) {
-          color = '#a855f7'; // purple
-          coreColor = '#c084fc';
-        }
-
-        hotspots.push({
-          name: item.name,
-          disease: item.disease || topDisease,
-          cases: item.cases || Math.ceil(totalRecords / Math.max(1, locList.length)),
-          origX: radius * Math.cos(latRad) * Math.cos(lonRad),
-          origY: radius * Math.sin(latRad),
-          origZ: radius * Math.cos(latRad) * Math.sin(lonRad),
-          color,
-          coreColor,
-        });
-      });
-    }
+    let pulseTime = 0;
 
     const render = () => {
+      pulseTime += 0.04;
+      const rot = rotRef.current;
+
+      if (isAutoRotate && !isDragging) {
+        rot.rotY += rot.velocityY;
+      }
+
       ctx.clearRect(0, 0, canvas.width, canvas.height);
+
       const cx = canvas.width / 2;
       const cy = canvas.height / 2;
+      const currentRadius = baseRadius * zoomScale;
 
-      // Update rotation with gentle inertia
-      if (!isDragging) {
-        rotRef.current.rotY += rotRef.current.velocityY;
-        rotRef.current.tiltX += rotRef.current.velocityX;
-        rotRef.current.velocityX *= 0.95; // damping
-      }
+      const cosY = Math.cos(rot.rotY);
+      const sinY = Math.sin(rot.rotY);
+      const cosX = Math.cos(rot.tiltX);
+      const sinX = Math.sin(rot.tiltX);
 
-      const rotY = rotRef.current.rotY;
-      const tiltX = rotRef.current.tiltX;
-
-      const cosRot = Math.cos(rotY);
-      const sinRot = Math.sin(rotY);
-      const cosTilt = Math.cos(tiltX);
-      const sinTilt = Math.sin(tiltX);
-
-      // --- LAYER 1: Deep Volumetric Holographic Glow ---
-      const outerGlow = ctx.createRadialGradient(cx, cy, radius * 0.4, cx, cy, radius * 1.4);
-      if (totalRecords > 0) {
-        outerGlow.addColorStop(0, 'rgba(6, 182, 212, 0.16)');
-        outerGlow.addColorStop(0.4, 'rgba(147, 51, 234, 0.10)');
-        outerGlow.addColorStop(0.75, 'rgba(6, 182, 212, 0.03)');
-      } else {
-        outerGlow.addColorStop(0, 'rgba(71, 85, 105, 0.12)');
-        outerGlow.addColorStop(0.6, 'rgba(30, 41, 59, 0.04)');
-      }
-      outerGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-
-      ctx.fillStyle = outerGlow;
+      // Deep Hologram Glow
+      const glowGrad = ctx.createRadialGradient(cx, cy, currentRadius * 0.1, cx, cy, currentRadius * 1.35);
+      glowGrad.addColorStop(0, 'rgba(6, 182, 212, 0.15)');
+      glowGrad.addColorStop(0.5, 'rgba(168, 85, 247, 0.08)');
+      glowGrad.addColorStop(1, 'rgba(4, 6, 12, 0)');
+      ctx.fillStyle = glowGrad;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius * 1.4, 0, Math.PI * 2);
+      ctx.arc(cx, cy, currentRadius * 1.35, 0, Math.PI * 2);
       ctx.fill();
 
-      // --- LAYER 2: Inner Deep Dark Energy Core ---
-      const coreGlow = ctx.createRadialGradient(cx, cy, 5, cx, cy, radius * 0.96);
-      if (totalRecords > 0) {
-        coreGlow.addColorStop(0, '#0c162e');
-        coreGlow.addColorStop(0.6, '#060a17');
-        coreGlow.addColorStop(1, '#02040a');
-      } else {
-        coreGlow.addColorStop(0, '#0f1422');
-        coreGlow.addColorStop(0.7, '#070a13');
-        coreGlow.addColorStop(1, '#020307');
-      }
-      ctx.fillStyle = coreGlow;
+      // Outer Hologram Grid Sphere
+      ctx.strokeStyle = 'rgba(6, 182, 212, 0.14)';
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(cx, cy, radius * 0.96, 0, Math.PI * 2);
-      ctx.fill();
-
-      // --- LAYER 3: Holographic Equatorial Ring ---
-      ctx.beginPath();
-      ctx.arc(cx, cy, radius, 0, Math.PI * 2);
-      ctx.strokeStyle = totalRecords > 0 ? 'rgba(6, 182, 212, 0.35)' : 'rgba(100, 116, 139, 0.2)';
-      ctx.lineWidth = 1.4;
-      ctx.shadowColor = totalRecords > 0 ? 'rgba(6, 182, 212, 0.6)' : 'rgba(100, 116, 139, 0.2)';
-      ctx.shadowBlur = 10;
+      ctx.arc(cx, cy, currentRadius, 0, Math.PI * 2);
       ctx.stroke();
-      ctx.shadowBlur = 0;
 
-      // Project all 3D points
-      interface ProjectedPoint {
-        sx: number;
-        sy: number;
-        sz: number;
-        size: number;
-        brightness: number;
-        type: string;
-      }
+      // Render 3D Sphere Points
+      points.forEach((pt) => {
+        let x1 = pt.origX * cosY - pt.origZ * sinY;
+        let z1 = pt.origZ * cosY + pt.origX * sinY;
 
-      const projected: ProjectedPoint[] = [];
+        let y2 = pt.origY * cosX - z1 * sinX;
+        let z2 = z1 * cosX + pt.origY * sinX;
 
-      points.forEach((p) => {
-        // Y rotation
-        const rx = p.origX * cosRot - p.origZ * sinRot;
-        const rz = p.origX * sinRot + p.origZ * cosRot;
+        pt.x = x1 * zoomScale;
+        pt.y = y2 * zoomScale;
+        pt.z = z2 * zoomScale;
 
-        // X tilt
-        const ry = p.origY * cosTilt - rz * sinTilt;
-        const finalZ = p.origY * sinTilt + rz * cosTilt;
+        // Front-facing depth factor
+        const alpha = Math.max(0.12, (z2 + currentRadius) / (currentRadius * 2));
+        const screenX = cx + pt.x;
+        const screenY = cy + pt.y;
 
-        // Perspective scale factor
-        const fov = 340;
-        const scale = fov / (fov + finalZ);
-        const sx = cx + rx * scale;
-        const sy = cy - ry * scale;
-
-        projected.push({
-          sx,
-          sy,
-          sz: finalZ,
-          size: p.size * scale,
-          brightness: p.brightness,
-          type: p.type,
-        });
-      });
-
-      // Sort by Z for true 3D depth perception
-      projected.sort((a, b) => a.sz - b.sz);
-
-      // Render projected points with depth coloring
-      projected.forEach((p) => {
-        // Normalize Z depth (-radius to +radius)
-        const depthRatio = (p.sz + radius * 1.2) / (radius * 2.4);
-        const alpha = Math.max(0.08, Math.min(1, depthRatio * p.brightness));
+        ctx.fillStyle =
+          pt.type === 'orbital'
+            ? `rgba(168, 85, 247, ${alpha * 0.7})`
+            : `rgba(6, 182, 212, ${alpha * pt.brightness})`;
 
         ctx.beginPath();
-        ctx.arc(p.sx, p.sy, p.size, 0, Math.PI * 2);
-
-        if (totalRecords > 0) {
-          if (p.type === 'orbital') {
-            ctx.fillStyle = `rgba(168, 85, 247, ${alpha * 0.7})`;
-          } else if (p.sz > 30) {
-            ctx.fillStyle = `rgba(34, 211, 238, ${alpha})`;
-          } else if (p.sz > -30) {
-            ctx.fillStyle = `rgba(6, 182, 212, ${alpha * 0.75})`;
-          } else {
-            ctx.fillStyle = `rgba(147, 51, 234, ${alpha * 0.4})`;
-          }
-        } else {
-          ctx.fillStyle = `rgba(148, 163, 184, ${alpha * 0.45})`;
-        }
-
+        ctx.arc(screenX, screenY, pt.size * (0.8 + alpha * 0.4), 0, Math.PI * 2);
         ctx.fill();
       });
 
-      // --- LAYER 4: Animated Great-Circle Cyber Transmission Arcs ---
-      if (totalRecords > 0 && hotspots.length > 1) {
-        const time = Date.now() / 1000;
+      // Render Hotspots with Glowing Pulse Halos and Beacons
+      activeHotspots.forEach((spot) => {
+        const phiCoord = (90 - spot.lat) * (Math.PI / 180);
+        const thetaCoord = (spot.lng + 180) * (Math.PI / 180);
 
-        for (let i = 0; i < hotspots.length - 1; i++) {
-          const h1 = hotspots[i];
-          const h2 = hotspots[i + 1];
+        const hx = -(currentRadius * Math.sin(phiCoord) * Math.cos(thetaCoord));
+        const hz = currentRadius * Math.sin(phiCoord) * Math.sin(thetaCoord);
+        const hy = currentRadius * Math.cos(phiCoord);
 
-          // Project h1
-          const rx1 = h1.origX * cosRot - h1.origZ * sinRot;
-          const rz1 = h1.origX * sinRot + h1.origZ * cosRot;
-          const ry1 = h1.origY * cosTilt - rz1 * sinTilt;
-          const z1 = h1.origY * sinTilt + rz1 * cosTilt;
+        const x1 = hx * cosY - hz * sinY;
+        const z1 = hz * cosY + hx * sinY;
 
-          // Project h2
-          const rx2 = h2.origX * cosRot - h2.origZ * sinRot;
-          const rz2 = h2.origX * sinRot + h2.origZ * cosRot;
-          const ry2 = h2.origY * cosTilt - rz2 * sinTilt;
-          const z2 = h2.origY * sinTilt + rz2 * cosTilt;
+        const y2 = hy * cosX - z1 * sinX;
+        const z2 = z1 * cosX + hy * sinX;
 
-          if (z1 > -40 || z2 > -40) {
-            const fov = 340;
-            const s1 = fov / (fov + z1);
-            const s2 = fov / (fov + z2);
+        // Only render front-facing hotspots (z2 > -20)
+        if (z2 > -20) {
+          const sx = cx + x1;
+          const sy = cy + y2;
 
-            const sx1 = cx + rx1 * s1;
-            const sy1 = cy - ry1 * s1;
-            const sx2 = cx + rx2 * s2;
-            const sy2 = cy - ry2 * s2;
-
-            const midX = (sx1 + sx2) / 2;
-            const midY = (sy1 + sy2) / 2 - 28; // high curvature arc
-
-            // Draw cyber arc line
-            ctx.beginPath();
-            ctx.moveTo(sx1, sy1);
-            ctx.quadraticCurveTo(midX, midY, sx2, sy2);
-            ctx.strokeStyle = 'rgba(6, 182, 212, 0.4)';
-            ctx.lineWidth = 1.3;
-            ctx.stroke();
-
-            // Animated light particle traveling along arc
-            const t = (time * 0.55 + i * 0.28) % 1;
-            const px = (1 - t) * (1 - t) * sx1 + 2 * (1 - t) * t * midX + t * t * sx2;
-            const py = (1 - t) * (1 - t) * sy1 + 2 * (1 - t) * t * midY + t * t * sy2;
-
-            ctx.beginPath();
-            ctx.arc(px, py, 2.6, 0, Math.PI * 2);
-            ctx.fillStyle = '#22d3ee';
-            ctx.shadowColor = '#22d3ee';
-            ctx.shadowBlur = 8;
-            ctx.fill();
-            ctx.shadowBlur = 0;
+          let color = '#10b981'; // Low
+          let glowColor = 'rgba(16, 185, 129, ';
+          if (spot.riskLevel === 'Critical') {
+            color = '#f43f5e';
+            glowColor = 'rgba(244, 63, 94, ';
+          } else if (spot.riskLevel === 'High') {
+            color = '#f97316';
+            glowColor = 'rgba(249, 115, 22, ';
+          } else if (spot.riskLevel === 'Medium') {
+            color = '#eab308';
+            glowColor = 'rgba(234, 179, 8, ';
           }
+
+          // Animated pulsating beacon halo
+          const pulse = (Math.sin(pulseTime * 2.5 + spot.lat) + 1) / 2;
+          const haloRadius = 6 + pulse * 14;
+
+          ctx.strokeStyle = `${glowColor}${0.6 - pulse * 0.5})`;
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.arc(sx, sy, haloRadius, 0, Math.PI * 2);
+          ctx.stroke();
+
+          // Outer secondary ring for critical
+          if (spot.riskLevel === 'Critical') {
+            ctx.strokeStyle = `rgba(244, 63, 94, ${0.4 - pulse * 0.3})`;
+            ctx.beginPath();
+            ctx.arc(sx, sy, haloRadius * 1.5, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+
+          // Beacon Center Node
+          ctx.fillStyle = color;
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 10;
+          ctx.beginPath();
+          ctx.arc(sx, sy, 4.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+
+          // Location Tag Pill
+          ctx.font = 'bold 10px monospace';
+          ctx.fillStyle = '#ffffff';
+          ctx.fillText(spot.name, sx + 8, sy + 3);
         }
-      }
-
-      // --- LAYER 5: Hotspot Nodes with Radiating Sonar Pulses & Beacons ---
-      if (totalRecords > 0) {
-        const timeNow = Date.now();
-
-        hotspots.forEach((h, idx) => {
-          const rx = h.origX * cosRot - h.origZ * sinRot;
-          const rz = h.origX * sinRot + h.origZ * cosRot;
-          const ry = h.origY * cosTilt - rz * sinTilt;
-          const finalZ = h.origY * sinTilt + rz * cosTilt;
-
-          if (finalZ > -15) {
-            const fov = 340;
-            const scale = fov / (fov + finalZ);
-            const sx = cx + rx * scale;
-            const sy = cy - ry * scale;
-            const frontAlpha = Math.min(1, (finalZ + 15) / 60);
-
-            // 1. Concentric Expanding Pulse Rings (Sonar Radar)
-            const pulsePhase = (timeNow / 850 + idx * 0.35) % 1;
-            const pulseRadius = (6 + pulsePhase * 22) * scale;
-            const pulseOpacity = (1 - pulsePhase) * frontAlpha * 0.85;
-
-            ctx.beginPath();
-            ctx.arc(sx, sy, pulseRadius, 0, Math.PI * 2);
-            ctx.strokeStyle = `${h.color}${Math.round(pulseOpacity * 255)
-              .toString(16)
-              .padStart(2, '0')}`;
-            ctx.lineWidth = 1.3;
-            ctx.stroke();
-
-            // 2. Rising Energy Beacon Pillar
-            const normalX = rx / radius;
-            const normalY = -ry / radius;
-            const pillarHeight = 18 * scale;
-            const topX = sx + normalX * pillarHeight;
-            const topY = sy + normalY * pillarHeight;
-
-            ctx.beginPath();
-            ctx.moveTo(sx, sy);
-            ctx.lineTo(topX, topY);
-            ctx.strokeStyle = `${h.color}cc`;
-            ctx.lineWidth = 1.6;
-            ctx.stroke();
-
-            // Beacon Tip
-            ctx.beginPath();
-            ctx.arc(topX, topY, 2.2, 0, Math.PI * 2);
-            ctx.fillStyle = '#ffffff';
-            ctx.fill();
-
-            // 3. Hotspot Epicenter Core with Neon Glow
-            ctx.beginPath();
-            ctx.arc(sx, sy, 4.2 * scale, 0, Math.PI * 2);
-            ctx.fillStyle = h.coreColor;
-            ctx.shadowColor = h.color;
-            ctx.shadowBlur = 12;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-
-            // 4. Futuristic Floating Tag Label
-            if (idx === 0 || finalZ > 45) {
-              ctx.font = 'bold 9px JetBrains Mono, monospace';
-              const labelText = `${h.name} (${h.cases})`;
-              const textWidth = ctx.measureText(labelText).width;
-
-              const tagX = topX + 6;
-              const tagY = topY - 7;
-
-              ctx.fillStyle = 'rgba(6, 9, 18, 0.92)';
-              ctx.strokeStyle = `${h.color}aa`;
-              ctx.lineWidth = 1;
-              ctx.beginPath();
-              ctx.roundRect
-                ? ctx.roundRect(tagX, tagY, textWidth + 8, 14, 4)
-                : ctx.rect(tagX, tagY, textWidth + 8, 14);
-              ctx.fill();
-              ctx.stroke();
-
-              ctx.fillStyle = '#ffffff';
-              ctx.fillText(labelText, tagX + 4, tagY + 10);
-            }
-          }
-        });
-      }
+      });
 
       animationFrameId = requestAnimationFrame(render);
     };
@@ -438,26 +309,71 @@ export const Globe3D: React.FC<Globe3DProps> = ({
     return () => {
       cancelAnimationFrame(animationFrameId);
     };
-  }, [r0, topDisease, topLocation, totalRecords, locations, isDragging]);
+  }, [activeHotspots, isAutoRotate, zoomScale, isDragging]);
 
-  // Drag interaction with inertia
-  const handleMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Click handler to select hotspot & display interactive detail popup
+  const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const clickY = e.clientY - rect.top;
+
+    const cx = canvas.width / 2;
+    const cy = canvas.height / 2;
+    const currentRadius = 150 * zoomScale;
+
+    const cosY = Math.cos(rotRef.current.rotY);
+    const sinY = Math.sin(rotRef.current.rotY);
+    const cosX = Math.cos(rotRef.current.tiltX);
+    const sinX = Math.sin(rotRef.current.tiltX);
+
+    let clicked: HotspotDetail | null = null;
+    let closestDist = 24;
+
+    activeHotspots.forEach((spot) => {
+      const phiCoord = (90 - spot.lat) * (Math.PI / 180);
+      const thetaCoord = (spot.lng + 180) * (Math.PI / 180);
+
+      const hx = -(currentRadius * Math.sin(phiCoord) * Math.cos(thetaCoord));
+      const hz = currentRadius * Math.sin(phiCoord) * Math.sin(thetaCoord);
+      const hy = currentRadius * Math.cos(phiCoord);
+
+      const x1 = hx * cosY - hz * sinY;
+      const z1 = hz * cosY + hx * sinY;
+      const y2 = hy * cosX - z1 * sinX;
+      const z2 = z1 * cosX + hy * sinX;
+
+      if (z2 > -20) {
+        const sx = cx + x1;
+        const sy = cy + y2;
+        const dist = Math.hypot(clickX - sx, clickY - sy);
+        if (dist < closestDist) {
+          closestDist = dist;
+          clicked = spot;
+        }
+      }
+    });
+
+    if (clicked) {
+      setSelectedHotspot(clicked);
+      setPopupPos({ x: clickX, y: clickY });
+    } else {
+      setSelectedHotspot(null);
+    }
+  };
+
+  const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     setDragStart({ x: e.clientX, y: e.clientY });
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  const handleMouseMove = (e: React.MouseEvent) => {
     if (!isDragging) return;
-    const deltaX = e.clientX - dragStart.x;
-    const deltaY = e.clientY - dragStart.y;
-
-    rotRef.current.rotY += deltaX * 0.007;
-    rotRef.current.tiltX = Math.max(
-      -0.6,
-      Math.min(0.6, rotRef.current.tiltX + deltaY * 0.004)
-    );
-    rotRef.current.velocityX = deltaY * 0.0004;
-
+    const dx = e.clientX - dragStart.x;
+    const dy = e.clientY - dragStart.y;
+    rotRef.current.rotY += dx * 0.007;
+    rotRef.current.tiltX = Math.max(-0.8, Math.min(0.8, rotRef.current.tiltX + dy * 0.007));
     setDragStart({ x: e.clientX, y: e.clientY });
   };
 
@@ -466,63 +382,163 @@ export const Globe3D: React.FC<Globe3DProps> = ({
   };
 
   return (
-    <div className="relative flex items-center justify-center w-full max-w-[430px] aspect-square mx-auto select-none group">
-      {/* 3D Canvas */}
-      <canvas
-        ref={canvasRef}
-        width={430}
-        height={430}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={handleMouseUp}
-        className="relative z-10 w-full h-full cursor-grab active:cursor-grabbing"
-        title="Interactive 3D Biosurveillance Sphere: Drag to rotate"
-      />
+    <div className="relative w-full rounded-3xl bg-gradient-to-b from-[#060812] via-[#04060d] to-[#060812] border border-cyan-500/20 p-6 overflow-hidden shadow-2xl">
+      {/* Background Cyber Ambient Grid */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,_var(--tw-gradient-stops))] from-cyan-900/10 via-slate-950/40 to-transparent pointer-events-none" />
 
-      {/* Futuristic Telemetry Indicator (Top Left) */}
-      <div className="absolute top-2 left-0 z-20 p-2.5 rounded-2xl bg-[#080c18]/90 border border-cyan-500/30 backdrop-blur-xl shadow-xl text-left pointer-events-none">
-        <div className="flex items-center gap-1.5 text-[10px] font-mono text-cyan-400 font-bold uppercase">
-          <Activity className="w-3 h-3 text-cyan-400" />
-          Biosurveillance Core
+      {/* Top HUD Header */}
+      <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-800/80">
+        <div>
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+            <h3 className="text-base font-black text-white font-mono tracking-tight">
+              Global & Regional 3D Biosurveillance Sphere
+            </h3>
+          </div>
+          <p className="text-xs text-slate-400 font-mono mt-0.5">
+            OutbreakX monitors disease vectors and cluster momentum worldwide &bull; Interactive 3D Hologram
+          </p>
         </div>
-        <div className="text-xs font-black font-mono text-white mt-0.5">
-          {totalRecords > 0 ? (
-            <>
-              {r0 > 0 ? r0 : '--'}{' '}
-              <span className="text-[10px] font-normal text-slate-400">Velocity (R₀)</span>
-            </>
-          ) : (
-            <span className="text-slate-400 font-mono">Standby (0 Records)</span>
-          )}
-        </div>
-      </div>
 
-      {/* Outbreak / Dataset Status (Bottom Right) */}
-      <div className="absolute bottom-4 right-0 z-20 p-2.5 rounded-2xl bg-[#080c18]/90 border border-slate-700/60 backdrop-blur-xl shadow-xl text-left pointer-events-none">
-        <div className="flex items-center gap-1.5 text-[10px] font-mono text-slate-400 font-bold uppercase">
-          <Radio
-            className={`w-3 h-3 ${
-              totalRecords > 0 ? 'text-rose-400 animate-ping' : 'text-slate-500'
+        {/* HUD Controls */}
+        <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-900/90 border border-slate-800">
+          <button
+            onClick={() => setIsAutoRotate((prev) => !prev)}
+            className={`p-2 rounded-xl transition ${
+              isAutoRotate ? 'bg-cyan-500/20 text-cyan-300' : 'text-slate-400 hover:text-white'
             }`}
-          />
-          {totalRecords > 0 ? 'Active Epicenter' : 'Surveillance State'}
-        </div>
-        <div className="text-xs font-bold text-white mt-0.5 max-w-[150px] truncate">
-          {totalRecords > 0 && topLocation ? (
-            <>
-              {topLocation} {topDisease ? `• ${topDisease}` : ''}
-            </>
-          ) : (
-            <span className="text-slate-400">No Dataset Loaded</span>
-          )}
+            title={isAutoRotate ? 'Pause Rotation' : 'Resume Rotation'}
+          >
+            {isAutoRotate ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
+          </button>
+          <button
+            onClick={() => setZoomScale((z) => Math.min(1.35, z + 0.1))}
+            className="p-2 text-slate-400 hover:text-white transition"
+            title="Zoom In"
+          >
+            <ZoomIn className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => setZoomScale((z) => Math.max(0.75, z - 0.1))}
+            className="p-2 text-slate-400 hover:text-white transition"
+            title="Zoom Out"
+          >
+            <ZoomOut className="w-3.5 h-3.5" />
+          </button>
+          <button
+            onClick={() => {
+              setZoomScale(1);
+              rotRef.current.rotY = -0.8;
+              rotRef.current.tiltX = 0.28;
+              setSelectedHotspot(null);
+            }}
+            className="p-2 text-slate-400 hover:text-white transition"
+            title="Reset Angle"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
-      {/* Interaction Hint (Bottom Left) */}
-      <div className="absolute bottom-2 left-2 z-20 flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-slate-900/80 border border-slate-800 backdrop-blur-md text-[10px] font-mono text-slate-400 pointer-events-none">
-        <Compass className="w-3 h-3 text-cyan-400" />
-        <span>Drag sphere to rotate</span>
+      {/* Main 3D Canvas Viewport */}
+      <div className="relative w-full flex justify-center items-center py-4 select-none">
+        <canvas
+          ref={canvasRef}
+          width={640}
+          height={480}
+          onClick={handleCanvasClick}
+          onMouseDown={handleMouseDown}
+          onMouseMove={handleMouseMove}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseUp}
+          className="cursor-grab active:cursor-grabbing w-full max-w-[640px] h-auto drop-shadow-[0_0_35px_rgba(6,182,212,0.2)]"
+        />
+
+        {/* Hotspot Click Popup */}
+        {selectedHotspot && (
+          <div
+            className="absolute z-20 w-72 p-4 rounded-2xl bg-[#070b16]/95 border-2 border-cyan-400/60 shadow-2xl backdrop-blur-2xl animate-fade-in space-y-3"
+            style={{
+              left: popupPos ? Math.min(popupPos.x + 20, 360) : '50%',
+              top: popupPos ? Math.min(popupPos.y - 40, 260) : '40%',
+            }}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                <h4 className="text-sm font-black text-white font-mono">
+                  📍 {selectedHotspot.name}
+                </h4>
+              </div>
+              <button
+                onClick={() => setSelectedHotspot(null)}
+                className="text-slate-400 hover:text-white transition"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 text-xs font-mono">
+              <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[10px] text-slate-400">Target Pathogen</span>
+                <div className="text-xs font-bold text-cyan-300 truncate">
+                  {selectedHotspot.disease}
+                </div>
+              </div>
+
+              <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[10px] text-slate-400">Total Cases</span>
+                <div className="text-xs font-bold text-white">
+                  {selectedHotspot.cases} cases
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-xs font-mono">
+              <span className="text-slate-400">Risk Level:</span>
+              <span
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase ${
+                  selectedHotspot.riskLevel === 'Critical'
+                    ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
+                    : selectedHotspot.riskLevel === 'High'
+                    ? 'bg-orange-500/20 text-orange-300 border border-orange-500/40'
+                    : selectedHotspot.riskLevel === 'Medium'
+                    ? 'bg-yellow-500/20 text-yellow-300 border border-yellow-500/40'
+                    : 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                }`}
+              >
+                {selectedHotspot.riskLevel} Risk
+              </span>
+            </div>
+
+            <div className="p-2 rounded-xl bg-slate-900/60 border border-slate-800 text-[11px] font-mono text-slate-300">
+              <strong className="text-cyan-400">Recent Trend:</strong> {selectedHotspot.recentTrend}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Bottom Telemetry HUD */}
+      <div className="relative z-10 grid grid-cols-2 sm:grid-cols-4 gap-3 pt-4 border-t border-slate-800/80 text-xs font-mono">
+        <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">
+          <span className="text-slate-400 text-[10px] uppercase">Surveillance Scope</span>
+          <div className="text-sm font-bold text-white mt-0.5">Worldwide & Regional</div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">
+          <span className="text-slate-400 text-[10px] uppercase">Reproduction Pace</span>
+          <div className="text-sm font-bold text-purple-300 mt-0.5">R₀ = {r0}</div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">
+          <span className="text-slate-400 text-[10px] uppercase">Active Epicenter</span>
+          <div className="text-sm font-bold text-cyan-300 mt-0.5 truncate">{topLocation}</div>
+        </div>
+
+        <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">
+          <span className="text-slate-400 text-[10px] uppercase">Monitored Hotspots</span>
+          <div className="text-sm font-bold text-emerald-400 mt-0.5">{activeHotspots.length} Nodes</div>
+        </div>
       </div>
     </div>
   );

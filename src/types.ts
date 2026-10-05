@@ -1,35 +1,36 @@
-export type SeverityLevel = 'Mild' | 'Moderate' | 'Severe' | 'Critical';
+export type SeverityLevel = 'Normal' | 'Moderate' | 'Severe' | 'Critical';
 export type OutcomeStatus = 'Active' | 'Recovered' | 'Deceased';
-export type GenderType = 'Male' | 'Female' | 'Other' | 'Undisclosed';
-export type RiskClassification = 'Safe' | 'Medium' | 'High';
+export type GenderType = 'Male' | 'Female' | 'Other';
+export type RiskClassification = 'Low' | 'Medium' | 'High' | 'Critical';
 
 export interface OutbreakRecord {
   id: string;
   date: string; // YYYY-MM-DD
-  region: string; // Location / Area / Region
-  city?: string; // Auto-detected or specified city
-  district?: string;
-  state?: string;
+  region: string; // Region / Zone (e.g., Chennai, Coimbatore, Madurai)
+  district?: string; // District alias
   disease: string;
-  cases?: number; // Number of cases recorded (defaults to 1)
-  age: number;
+  age?: number; // e.g. 25, 42, 12
   ageGroup?: string; // Child (0-12), Teen (13-19), Adult (20-59), Senior (60+)
-  gender: GenderType;
+  sex: GenderType;
   severity: SeverityLevel;
-  weather?: string; // Sunny/Hot, Rainy/Monsoon, Humid, Cold/Winter, Stormy
-  jobType?: string; // Student, Healthcare, Office, Factory, Outdoor, Other
-  hospitalized: boolean;
-  icu: boolean;
-  outcome: OutcomeStatus;
   symptoms: string[];
+  cases: number; // Cases recorded
+  deaths: number; // Deaths recorded
+  recovered: number; // Recovered recorded
+  population?: number;
   notes?: string;
+  weather?: string;
+  hospitalized?: boolean;
+  icu?: boolean;
 }
+
+export type AlertLevel = 'critical' | 'high' | 'medium';
 
 export interface LiveAlert {
   id: string;
   title: string;
-  type: 'growth' | 'hospital' | 'spike' | 'weather';
-  level: 'info' | 'warning' | 'critical';
+  type: 'growth' | 'spike' | 'cluster' | 'transmission';
+  level: AlertLevel;
   location: string;
   disease: string;
   metric: string;
@@ -41,32 +42,31 @@ export interface DiseaseStat {
   name: string;
   count: number;
   percentage: number;
-  riskLevel: 'Low' | 'Guarded' | 'Elevated' | 'Critical';
+  riskLevel: 'Low' | 'Medium' | 'High' | 'Critical';
   growthRate: number; // percentage vs prior period
   r0Estimate: number;
-  severeRate: number;
+  affectedDistricts: string[];
 }
 
 export interface ZoneStat {
   name: string;
   count: number;
   riskScore: number; // 0 - 100
-  riskCategory: RiskClassification;
+  riskCategory: 'Low' | 'Medium' | 'High' | 'Critical';
   activeDiseases: string[];
-  severeCases: number;
-  hospitalizedCount: number;
-  icuCount: number;
   weeklyGrowth: number;
+  latitude?: number;
+  longitude?: number;
   coordinates?: { x: number; y: number };
 }
 
 export interface DailyTrendPoint {
   date: string;
   cases: number;
+  deaths: number;
+  recovered: number;
   movingAvg7: number;
-  severe: number;
-  hospitalized: number;
-  icu: number;
+  growthRate?: number;
 }
 
 export interface ForecastPoint {
@@ -75,16 +75,23 @@ export interface ForecastPoint {
   predictedCases: number;
   lowerCI: number;
   upperCI: number;
-  confidenceScore: number;
 }
 
-export interface HospitalSurgePoint {
-  day: string;
-  date: string;
-  generalBedsRequired: number;
-  icuBedsRequired: number;
-  ventilatorsRequired: number;
-  staffSurgeFactor: number;
+export interface OutbreakPrediction {
+  disease: string;
+  probability: number; // 0 - 100%
+  timeWindow: string; // e.g. "2–4 Weeks"
+  affectedDistricts: string[]; // e.g. ["Chennai", "Chengalpattu", "Kanchipuram"]
+  explanation: string;
+  projectedCases: number;
+  growthRate: number;
+  estimatedR0: number;
+  secondaryOutbreaks: {
+    disease: string;
+    probability: number;
+    districts: string[];
+    timeWindow: string;
+  }[];
 }
 
 export interface OutbreakAnomaly {
@@ -104,40 +111,34 @@ export interface EpidemiologicalIntelligence {
   activeCases: number;
   recoveredCount: number;
   deceasedCount: number;
-  communityHealthScore: number; // 0 - 100
+  communityHealthScore: number; // 0 - 100, purely data-calculated!
   activeAlertsCount: number;
   highRiskZonesCount: number;
   estimatedR0: number;
   growthRatePct: number;
-  severeRatio: number;
-  hospitalizedRatio: number;
-  icuRatio: number;
-  fatalityRatio: number;
   dateRange: { start: string; end: string } | null;
   topDiseases: DiseaseStat[];
   topZones: ZoneStat[];
   dailyTrends: DailyTrendPoint[];
-  ageCohorts: { cohort: string; count: number; percentage: number }[];
-  genderDistribution: { gender: string; count: number; percentage: number }[];
-  symptomFrequencies: { symptom: string; count: number; percentage: number }[];
+  severityDistribution: { severity: SeverityLevel; count: number; percentage: number }[];
+  ageGroupDistribution: { ageGroup: string; count: number; percentage: number }[];
   anomalies: OutbreakAnomaly[];
   forecast7Day: ForecastPoint[];
   forecast30Day: ForecastPoint[];
-  hospitalSurge: HospitalSurgePoint[];
-  radarAttributes: { attribute: string; score: number; maxScore: number; description: string }[];
+  prediction: OutbreakPrediction;
   liveAlerts: LiveAlert[];
 }
 
 export type ActivePage =
-  | 'landing'
+  | 'overview'
   | 'dashboard'
-  | 'analytics-dashboard'
-  | 'disease-intelligence'
-  | 'outbreak-heatmap'
-  | 'forecast-center'
-  | 'population-analytics'
-  | 'hospital-intelligence'
-  | 'ai-command-center'
-  | 'alert-center'
-  | 'threat-radar'
-  | 'dataset-management';
+  | 'map'
+  | 'network'
+  | 'prediction'
+  | 'alerts'
+  | 'analytics'
+  | 'dataset'
+  | 'upload'
+  | 'copilot'
+  | 'export'
+  | 'settings';

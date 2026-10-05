@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "ViraNexus AI",
-  "short_name": "ViraNexus",
-  "description": "AI-Powered Disease Outbreak Early Warning & Health Intelligence Platform - Predicting Outbreaks Before They Spread",
+  "name": "OUTBREAKX",
+  "short_name": "OUTBREAKX",
+  "description": "OUTBREAKX - AI-Powered Disease Outbreak Prediction & Early Warning System",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

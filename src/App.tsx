@@ -6,22 +6,20 @@ import { Sidebar } from './components/Sidebar';
 import { ParticleBackground } from './components/ParticleBackground';
 import { AddRecordModal } from './components/AddRecordModal';
 
-// Pages
-import { LandingPage } from './pages/LandingPage';
-import { ExecutiveDashboard } from './pages/ExecutiveDashboard';
-import { DiseaseIntelligence } from './pages/DiseaseIntelligence';
-import { OutbreakHeatmap } from './pages/OutbreakHeatmap';
-import { ForecastCenter } from './pages/ForecastCenter';
-import { PopulationAnalytics } from './pages/PopulationAnalytics';
-import { HospitalIntelligence } from './pages/HospitalIntelligence';
-import { AICommandCenter } from './pages/AICommandCenter';
+// The Core OUTBREAKX Modules
+import { Overview } from './pages/Overview';
+import { Dashboard } from './pages/Dashboard';
+import { DiseaseMap } from './pages/DiseaseMap';
+import { NetworkGraph } from './pages/NetworkGraph';
+import { PredictionCenter } from './pages/PredictionCenter';
+import { AlertCenter } from './pages/AlertCenter';
+import { Analytics } from './pages/Analytics';
 import { DatasetManagement } from './pages/DatasetManagement';
-import { HealthThreatRadar } from './components/HealthThreatRadar';
-import { LiveAlertCenter } from './components/LiveAlertCenter';
-import { RealTimeAnalyticsDashboard } from './components/analytics/RealTimeAnalyticsDashboard';
+import { AICopilot } from './pages/AICopilot';
+import { Settings } from './pages/Settings';
 
 export default function App() {
-  const [currentPage, setCurrentPage] = useState<ActivePage>('landing');
+  const [currentPage, setCurrentPage] = useState<ActivePage>('overview');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<OutbreakRecord | null>(null);
@@ -35,11 +33,11 @@ export default function App() {
   const {
     records,
     intelligence,
-    totalIntelligence,
     addRecord,
     updateRecord,
     deleteRecord,
     uploadRecords,
+    loadSampleDataset,
     clearAllRecords,
   } = useOutbreakData();
 
@@ -48,18 +46,13 @@ export default function App() {
     setIsAddModalOpen(true);
   };
 
-  const handleOpenEditModal = (record: OutbreakRecord) => {
-    setEditingRecord(record);
-    setIsAddModalOpen(true);
-  };
-
   const handleSaveRecord = (recordData: Omit<OutbreakRecord, 'id'>) => {
     if (editingRecord) {
       updateRecord(editingRecord.id, recordData);
-      showToast(`Updated record: ${recordData.disease} (${recordData.region})`);
+      showToast(`Updated record: ${recordData.disease} (${recordData.district})`);
     } else {
       addRecord(recordData);
-      showToast(`Indexed new case: ${recordData.disease} (${recordData.region})`);
+      showToast(`Indexed new case: ${recordData.disease} (${recordData.district})`);
     }
   };
 
@@ -68,9 +61,14 @@ export default function App() {
     showToast(`Indexed ${newRecords.length} outbreak cases successfully.`);
   };
 
+  const handleLoadSample = () => {
+    loadSampleDataset();
+    showToast('Loaded verified Tamil Nadu outbreak surveillance dataset.');
+  };
+
   const handleClearAll = () => {
     clearAllRecords();
-    showToast('Surveillance dataset cleared. Restored empty state.');
+    showToast('Surveillance dataset cleared. Restored baseline empty state.');
   };
 
   return (
@@ -83,8 +81,8 @@ export default function App() {
         currentPage={currentPage}
         onSelectPage={setCurrentPage}
         totalRecords={records.length}
-        healthScore={totalIntelligence.communityHealthScore}
-        activeAlerts={totalIntelligence.activeAlertsCount}
+        activeAlerts={intelligence.activeAlertsCount}
+        highRiskZones={intelligence.highRiskZonesCount}
         onOpenAddModal={handleOpenAddModal}
         isSidebarOpen={isSidebarOpen}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
@@ -98,127 +96,122 @@ export default function App() {
           isOpen={isSidebarOpen}
           onClose={() => setIsSidebarOpen(false)}
           totalRecords={records.length}
-          activeAlerts={totalIntelligence.activeAlertsCount}
+          activeAlerts={intelligence.activeAlertsCount}
         />
 
         {/* Main Content Area */}
         <main className="flex-1 min-w-0 px-4 sm:px-8 py-6 lg:pl-72 transition-all">
           <div className="max-w-7xl mx-auto">
-            {currentPage === 'landing' && (
-              <LandingPage
+            {/* 0. Landing / Overview Page (3D Globe + Hero Quote) */}
+            {currentPage === 'overview' && (
+              <Overview
+                intelligence={intelligence}
+                records={records}
                 onSelectPage={setCurrentPage}
-                intelligence={totalIntelligence}
-                totalRecords={records.length}
-                onUploadRecords={handleUploadRecords}
                 onOpenAddModal={handleOpenAddModal}
+                onLoadSample={handleLoadSample}
               />
             )}
 
+            {/* 1. Dashboard */}
             {currentPage === 'dashboard' && (
-              <ExecutiveDashboard
-                intelligence={totalIntelligence}
+              <Dashboard
+                intelligence={intelligence}
+                records={records}
+                onSelectPage={setCurrentPage}
+                onOpenAddModal={handleOpenAddModal}
+                onLoadSample={handleLoadSample}
+              />
+            )}
+
+            {/* 2. Disease Map */}
+            {currentPage === 'map' && (
+              <DiseaseMap
+                intelligence={intelligence}
+                records={records}
+                onSelectPage={setCurrentPage}
+                onLoadSample={handleLoadSample}
+                onOpenAddModal={handleOpenAddModal}
+              />
+            )}
+
+            {/* 3. Network Graph */}
+            {currentPage === 'network' && (
+              <NetworkGraph
+                records={records}
+                onSelectPage={setCurrentPage}
+                onLoadSample={handleLoadSample}
+              />
+            )}
+
+            {/* 4. Prediction Center */}
+            {currentPage === 'prediction' && (
+              <PredictionCenter
+                intelligence={intelligence}
+                records={records}
+                onSelectPage={setCurrentPage}
+                onLoadSample={handleLoadSample}
+              />
+            )}
+
+            {/* 5. Alert Center */}
+            {currentPage === 'alerts' && (
+              <AlertCenter
+                intelligence={intelligence}
                 totalRecords={records.length}
                 onSelectPage={setCurrentPage}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
+                onLoadSample={handleLoadSample}
               />
             )}
 
-            {currentPage === 'analytics-dashboard' && (
-              <RealTimeAnalyticsDashboard
+            {/* 6. Analytics */}
+            {currentPage === 'analytics' && (
+              <Analytics
+                intelligence={intelligence}
                 records={records}
-                intelligence={totalIntelligence}
                 onSelectPage={setCurrentPage}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
+                onLoadSample={handleLoadSample}
               />
             )}
 
-            {currentPage === 'disease-intelligence' && (
-              <DiseaseIntelligence
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'outbreak-heatmap' && (
-              <OutbreakHeatmap
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'forecast-center' && (
-              <ForecastCenter
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'population-analytics' && (
-              <PopulationAnalytics
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'hospital-intelligence' && (
-              <HospitalIntelligence
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'ai-command-center' && (
-              <AICommandCenter
-                intelligence={totalIntelligence}
-                records={records}
-                onUploadRecords={handleUploadRecords}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'alert-center' && (
-              <LiveAlertCenter
-                intelligence={totalIntelligence}
-                totalRecords={records.length}
-                onSelectPage={setCurrentPage}
-                onOpenAddModal={handleOpenAddModal}
-              />
-            )}
-
-            {currentPage === 'threat-radar' && (
-              <HealthThreatRadar
-                intelligence={totalIntelligence}
-                records={records}
-                onOpenAddModal={handleOpenAddModal}
-                onSelectPage={setCurrentPage}
-              />
-            )}
-
-            {currentPage === 'dataset-management' && (
+            {/* 7. Dataset Management (Core OutbreakX Engine) */}
+            {(currentPage === 'upload' || currentPage === 'dataset') && (
               <DatasetManagement
                 records={records}
-                onAddRecord={addRecord}
-                onUpdateRecord={updateRecord}
+                onAddRecord={handleSaveRecord}
+                onUpdateRecord={(id, updated) => {
+                  updateRecord(id, updated);
+                  showToast('Record updated successfully.');
+                }}
                 onDeleteRecord={(id) => {
                   deleteRecord(id);
-                  showToast('Record removed.');
+                  showToast('Record deleted.');
                 }}
                 onUploadRecords={handleUploadRecords}
-                onClearAllRecords={handleClearAll}
+                onClearAll={handleClearAll}
                 onOpenAddModal={handleOpenAddModal}
-                onOpenEditModal={handleOpenEditModal}
+                onLoadSample={handleLoadSample}
+                onSelectPage={setCurrentPage}
+              />
+            )}
+
+            {/* 8. AI Copilot */}
+            {currentPage === 'copilot' && (
+              <AICopilot
+                intelligence={intelligence}
+                records={records}
+                onSelectPage={setCurrentPage}
+                onLoadSample={handleLoadSample}
+              />
+            )}
+
+            {/* 9. Settings */}
+            {currentPage === 'settings' && (
+              <Settings
+                records={records}
+                onClearAll={handleClearAll}
+                onLoadSample={handleLoadSample}
+                onSelectPage={setCurrentPage}
               />
             )}
           </div>
