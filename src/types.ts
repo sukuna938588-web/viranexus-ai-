@@ -8,6 +8,8 @@ export interface OutbreakRecord {
   date: string; // YYYY-MM-DD
   region: string; // Region / Zone (e.g., Chennai, Coimbatore, Madurai)
   district?: string; // District alias
+  latitude?: number; // Geo coordinate
+  longitude?: number; // Geo coordinate
   disease: string;
   age?: number; // e.g. 25, 42, 12
   ageGroup?: string; // Child (0-12), Teen (13-19), Adult (20-59), Senior (60+)
@@ -80,9 +82,11 @@ export interface ForecastPoint {
 export interface OutbreakPrediction {
   disease: string;
   probability: number; // 0 - 100%
+  confidence?: number; // Prediction confidence score (0-100%)
   timeWindow: string; // e.g. "2–4 Weeks"
   affectedDistricts: string[]; // e.g. ["Chennai", "Chengalpattu", "Kanchipuram"]
   explanation: string;
+  growthTrendExplanation?: string; // Empirical explanation of historical cases, deaths, recovery trends
   projectedCases: number;
   growthRate: number;
   estimatedR0: number;

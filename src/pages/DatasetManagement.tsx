@@ -555,52 +555,56 @@ export const DatasetManagement: React.FC<DatasetManagementProps> = ({
                     <ArrowUpDown className="w-3 h-3 text-cyan-400" />
                   </div>
                 </th>
-                {/* 4. Age / Sex */}
+                {/* 4. Age */}
                 <th className="py-3 px-3">
-                  <span>4. Age / Sex</span>
+                  <span>4. Age</span>
                 </th>
-                {/* 5. Severity */}
+                {/* 5. Sex */}
+                <th className="py-3 px-3">
+                  <span>5. Sex</span>
+                </th>
+                {/* 6. Severity */}
                 <th
                   onClick={() => handleSort('severity')}
                   className="py-3 px-3 cursor-pointer hover:text-white transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>5. Severity</span>
+                    <span>6. Severity</span>
                     <ArrowUpDown className="w-3 h-3 text-cyan-400" />
                   </div>
                 </th>
-                {/* 6. Symptoms */}
+                {/* 7. Symptoms */}
                 <th className="py-3 px-3">
-                  <span>6. Symptoms</span>
+                  <span>7. Symptoms</span>
                 </th>
-                {/* 7. Cases */}
+                {/* 8. Cases */}
                 <th
                   onClick={() => handleSort('cases')}
                   className="py-3 px-3 cursor-pointer hover:text-white transition"
                 >
                   <div className="flex items-center gap-1">
-                    <span>7. Cases</span>
+                    <span>8. Cases</span>
                     <ArrowUpDown className="w-3 h-3 text-cyan-400" />
                   </div>
                 </th>
-                {/* 8. Deaths */}
+                {/* 9. Deaths */}
                 <th className="py-3 px-3">
-                  <span>8. Deaths</span>
+                  <span>9. Deaths</span>
                 </th>
-                {/* 9. Recovered */}
+                {/* 10. Recovered */}
                 <th className="py-3 px-3">
-                  <span>9. Recovered</span>
+                  <span>10. Recovered</span>
                 </th>
-                {/* 10. Actions */}
+                {/* Actions */}
                 <th className="py-3 px-3 text-right">
-                  <span>10. Actions</span>
+                  <span>Actions (Edit / Delete)</span>
                 </th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/60">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={11} className="py-12 text-center text-slate-500 font-mono text-xs">
+                  <td colSpan={12} className="py-12 text-center text-slate-500 font-mono text-xs">
                     No surveillance records found matching current query or filters.
                   </td>
                 </tr>
@@ -628,7 +632,7 @@ export const DatasetManagement: React.FC<DatasetManagementProps> = ({
                       {/* Checkbox */}
                       <td className="py-3 px-2">
                         <button
-                          onClick={() => handleToggleRowSelect(r.id)}
+                           onClick={() => handleToggleRowSelect(r.id)}
                           className="p-1 hover:text-white"
                         >
                           {isSelected ? (
@@ -644,29 +648,32 @@ export const DatasetManagement: React.FC<DatasetManagementProps> = ({
 
                       {/* 2. Region / Zone */}
                       <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
-                        {r.region || r.district || 'Chennai'}
+                        {r.region || r.district || 'Metropolitan'}
                       </td>
 
                       {/* 3. Disease */}
                       <td className="py-3 px-3 text-cyan-300 font-medium whitespace-nowrap">{r.disease}</td>
 
-                      {/* 4. Age / Sex (e.g. 25 / Male, 42 / Female, 12 / Male) */}
-                      <td className="py-3 px-3 font-medium text-slate-200 whitespace-nowrap">
-                        <span className="font-bold text-white">{displayAge}</span>
-                        <span className="text-slate-500 mx-1">/</span>
-                        <span className={displaySex === 'Female' ? 'text-pink-300' : displaySex === 'Male' ? 'text-cyan-300' : 'text-purple-300'}>
+                      {/* 4. Age */}
+                      <td className="py-3 px-3 font-bold text-white whitespace-nowrap">
+                        {displayAge}
+                      </td>
+
+                      {/* 5. Sex */}
+                      <td className="py-3 px-3 whitespace-nowrap">
+                        <span className={`font-semibold ${displaySex === 'Female' ? 'text-pink-300' : displaySex === 'Male' ? 'text-cyan-300' : 'text-purple-300'}`}>
                           {displaySex}
                         </span>
                       </td>
 
-                      {/* 5. Severity (Normal, Moderate, Severe, Critical) */}
+                      {/* 6. Severity */}
                       <td className="py-3 px-3 whitespace-nowrap">
                         <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-bold border ${sevBadge}`}>
                           {r.severity}
                         </span>
                       </td>
 
-                      {/* 6. Symptoms (Multiple symptoms: Fever, Headache, Cough, Vomiting, Body Pain) */}
+                      {/* 7. Symptoms */}
                       <td className="py-3 px-3">
                         <div className="flex flex-wrap gap-1 max-w-[220px]">
                           {(r.symptoms && r.symptoms.length > 0 ? r.symptoms : ['Fever', 'Body Pain']).map((sym, sIdx) => (
@@ -680,16 +687,16 @@ export const DatasetManagement: React.FC<DatasetManagementProps> = ({
                         </div>
                       </td>
 
-                      {/* 7. Cases */}
+                      {/* 8. Cases */}
                       <td className="py-3 px-3 font-bold text-white">{r.cases}</td>
 
-                      {/* 8. Deaths */}
+                      {/* 9. Deaths */}
                       <td className="py-3 px-3 text-rose-400 font-semibold">{r.deaths || 0}</td>
 
-                      {/* 9. Recovered */}
+                      {/* 10. Recovered */}
                       <td className="py-3 px-3 text-emerald-400 font-semibold">{r.recovered || 0}</td>
 
-                      {/* 10. Actions (Edit & Delete) */}
+                      {/* Actions (Edit & Delete) */}
                       <td className="py-3 px-3 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button

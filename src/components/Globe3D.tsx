@@ -32,25 +32,12 @@ interface SpherePoint {
   type: 'core' | 'orbital';
 }
 
-// Global surveillance nodes to immediately establish world surveillance scale
-const GLOBAL_HUBS: HotspotDetail[] = [
-  { name: 'Chennai', disease: 'Dengue', cases: 88, riskLevel: 'Critical', recentTrend: '+28% Weekly acceleration', lat: 13.0827, lng: 80.2707 },
-  { name: 'Madurai', disease: 'Influenza A', cases: 48, riskLevel: 'High', recentTrend: '+19% Transmission pace', lat: 9.9252, lng: 78.1198 },
-  { name: 'Coimbatore', disease: 'Typhoid', cases: 29, riskLevel: 'Medium', recentTrend: 'Cluster stabilized', lat: 11.0168, lng: 76.9558 },
-  { name: 'Singapore', disease: 'Zika', cases: 14, riskLevel: 'Low', recentTrend: 'Vector containment active', lat: 1.3521, lng: 103.8198 },
-  { name: 'London', disease: 'Norovirus', cases: 42, riskLevel: 'Medium', recentTrend: 'Seasonal winter baseline', lat: 51.5074, lng: -0.1278 },
-  { name: 'Geneva', disease: 'Respiratory RSV', cases: 21, riskLevel: 'Low', recentTrend: 'WHO monitored zone', lat: 46.2044, lng: 6.1432 },
-  { name: 'Tokyo', disease: 'Influenza B', cases: 65, riskLevel: 'High', recentTrend: '+14% Metropolitan surge', lat: 35.6762, lng: 139.6503 },
-  { name: 'New York', disease: 'COVID-19 Variant', cases: 53, riskLevel: 'Medium', recentTrend: 'Steady community monitoring', lat: 40.7128, lng: -74.0060 },
-  { name: 'Nairobi', disease: 'Cholera', cases: 36, riskLevel: 'Critical', recentTrend: '+31% Water vector spread', lat: -1.2921, lng: 36.8219 },
-  { name: 'São Paulo', disease: 'Chikungunya', cases: 58, riskLevel: 'High', recentTrend: '+22% Tropical cluster', lat: -23.5505, lng: -46.6333 },
-];
-
+// Globe strictly plots locations derived from uploaded records - NO DEMO/FAKE NODES
 export const Globe3D: React.FC<Globe3DProps> = ({
   totalRecords = 0,
   r0 = 1.1,
-  topDisease = 'Dengue',
-  topLocation = 'Chennai',
+  topDisease,
+  topLocation,
   locations = [],
 }) => {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -68,15 +55,18 @@ export const Globe3D: React.FC<Globe3DProps> = ({
     velocityX: 0,
   });
 
-  // Combine user dataset locations with global reference nodes
+  // Strictly map user surveillance data - no hardcoded global hubs
   const activeHotspots: HotspotDetail[] = React.useMemo(() => {
+    if (!locations || locations.length === 0 || totalRecords === 0) {
+      return [];
+    }
+
     const list: HotspotDetail[] = [];
 
-    // Map user surveillance data first
     locations.forEach((loc) => {
       const tnMatch = TAMIL_NADU_DISTRICTS[loc.name];
-      const lat = tnMatch ? tnMatch.lat : 11.5 + Math.random() * 3;
-      const lng = tnMatch ? tnMatch.lng : 78.5 + Math.random() * 3;
+      const lat = tnMatch ? tnMatch.lat : 11.5 + ((loc.name.charCodeAt(0) % 5));
+      const lng = tnMatch ? tnMatch.lng : 78.5 + ((loc.name.charCodeAt(1) || 0) % 5);
 
       let rLevel: 'Low' | 'Medium' | 'High' | 'Critical' = 'Low';
       const sev = (loc.severity || '').toLowerCase();
@@ -87,7 +77,7 @@ export const Globe3D: React.FC<Globe3DProps> = ({
       list.push({
         name: loc.name,
         disease: loc.disease || topDisease || 'Pathogen',
-        cases: loc.cases || 12,
+        cases: loc.cases || 1,
         riskLevel: rLevel,
         recentTrend: rLevel === 'Critical' ? '+28% Active acceleration' : '+12% Monitored trajectory',
         lat,
@@ -95,15 +85,8 @@ export const Globe3D: React.FC<Globe3DProps> = ({
       });
     });
 
-    // Add global hubs if fewer user locations
-    GLOBAL_HUBS.forEach((hub) => {
-      if (!list.some((item) => item.name.toLowerCase() === hub.name.toLowerCase())) {
-        list.push(hub);
-      }
-    });
-
     return list;
-  }, [locations, topDisease]);
+  }, [locations, topDisease, totalRecords]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -454,6 +437,16 @@ export const Globe3D: React.FC<Globe3DProps> = ({
           className="cursor-grab active:cursor-grabbing w-full max-w-[640px] h-auto drop-shadow-[0_0_35px_rgba(6,182,212,0.2)]"
         />
 
+        {/* Standby State Badge if no records loaded */}
+        {totalRecords === 0 && (
+          <div className="absolute inset-x-0 bottom-6 flex justify-center pointer-events-none z-10 px-4">
+            <div className="px-4 py-2 rounded-2xl bg-slate-950/85 border border-slate-800 text-[11px] font-mono text-slate-400 backdrop-blur-md shadow-xl flex items-center gap-2 text-center">
+              <span className="w-2 h-2 rounded-full bg-slate-500 animate-pulse" />
+              <span>Standby: No outbreak dataset loaded &bull; Upload CSV records to plot live hotspots</span>
+            </div>
+          </div>
+        )}
+
         {/* Hotspot Click Popup */}
         {selectedHotspot && (
           <div
@@ -532,7 +525,9 @@ export const Globe3D: React.FC<Globe3DProps> = ({
 
         <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">
           <span className="text-slate-400 text-[10px] uppercase">Active Epicenter</span>
-          <div className="text-sm font-bold text-cyan-300 mt-0.5 truncate">{topLocation}</div>
+          <div className="text-sm font-bold text-cyan-300 mt-0.5 truncate">
+            {totalRecords > 0 ? (topLocation || 'Surveillance Node') : 'None'}
+          </div>
         </div>
 
         <div className="p-3 rounded-xl bg-[#05070e] border border-slate-800/80">

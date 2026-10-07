@@ -16,8 +16,8 @@ export function useOutbreakData() {
     } catch (e) {
       console.error('Failed to load stored records:', e);
     }
-    // Default to realistic verified Tamil Nadu surveillance dataset so judges immediately see the system live!
-    return getTamilNaduSampleDataset();
+    // Default to clean empty state - entire app is 100% dataset driven
+    return [];
   });
 
   const [isLoading, setIsLoading] = useState<boolean>(false);

@@ -78,12 +78,20 @@ function detectLanguage(text: string): 'tamil' | 'tanglish' | 'english' {
   }
 
   // Check for standalone Tanglish keywords and phonetic particles using word boundaries
-  const tanglishRegex = /\b(yen|eppadi|enge|aguthu|aaguthu|irukku|panrathu|panradhu|romba|solunga|pannalam|edhuku|ethukku|theriyuma|kooda|la|layum|adhu|idhu|varuthu|varum|paravuthu|paravutha|pathukalam|avasiyama|enna|nalla|illa|illai)\b/i;
+  const tanglishRegex = /\b(vanakkam|vanakam|epdi|irukinga|neenga|yaaru|nandri|yen|eppadi|enge|aguthu|aaguthu|irukku|panrathu|panradhu|romba|solunga|pannalam|edhuku|ethukku|theriyuma|kooda|la|layum|adhu|idhu|varuthu|varum|paravuthu|paravutha|pathukalam|avasiyama|enna|nalla|illa|illai)\b/i;
   if (tanglishRegex.test(text)) {
     return 'tanglish';
   }
 
   return 'english';
+}
+
+function isGreetingOrConversational(text: string): boolean {
+  const normalized = text.trim().toLowerCase();
+  const greetingRegex = /^(hi|hello|hey|vanakkam|vanakam|வணக்கம்|காலை வணக்கம்|மாலை வணக்கம்|epdi irukinga|how are you|who are you|neenga yaaru|who r u|what can you do|good morning|good evening|good afternoon|nandri|thanks|thank you|நன்றி|bye|goodbye|help|start|hola)(\s*[!?.])?$/i;
+  if (greetingRegex.test(normalized)) return true;
+  if (/\b(how are you|who are you|neenga yaaru|epdi irukinga|what are you|enna panra)\b/i.test(normalized)) return true;
+  return false;
 }
 
 // Natural, multi-language deterministic epidemiological synthesizer
@@ -94,6 +102,17 @@ function generateLocalHeuristicInsights(datasetSummary: any, question: string = 
   const growthRate = datasetSummary?.growthRatePct || 0;
   const r0 = datasetSummary?.estimatedR0 || 1.1;
   const lang = detectLanguage(question);
+
+  // Conversational & Greeting support
+  if (isGreetingOrConversational(question)) {
+    if (lang === 'tamil') {
+      return `வணக்கம்! நான் **OUTBREAKX AI Copilot**, உங்கள் பொது சுகாதார மற்றும் தொற்று நோய் கண்காணிப்பு AI ஆலோசகர்.\n\nநான் உங்களுக்கு எவ்வாறு உதவ முடியும்? பதிவேற்றப்பட்ட தரவுகளின் அடிப்படையில் மாவட்ட அபாயங்கள், தொற்று வளர்ச்சி விகிதம், பரவல் வேகம் (R₀), மற்றும் எதிர்கால கணிப்புகளைப் பற்றி நீங்கள் என்னிடம் கேட்கலாம்.\n\n---FOLLOW_UPS---\nதற்போதைய தொற்று நிலவரத்தை சுருக்கமாகக் கூறுக\nஎந்த மாவட்டத்தில் அதிக ஆபத்து உள்ளது?\nஅடுத்த வாரம் பரவல் எப்படி இருக்கும்?`;
+    }
+    if (lang === 'tanglish') {
+      return `Vanakkam! Naan **OUTBREAKX AI Copilot**, ungaloda disease surveillance and outbreak prediction assistant.\n\nNaan ungalukku eppadi help panna mudiyum? Ungaloda dataset la irukkura disease spread, high-risk districts, reproduction speed (R₀), and future outbreak predictions pathi enkitta keka mudiyum!\n\n---FOLLOW_UPS---\nCurrent outbreak status short ah solunga\nEndha district la risk athigama irukku?\nNext week outbreak eppadi irukkum?`;
+    }
+    return `Hello! I am **OUTBREAKX AI Copilot**, your intelligent epidemiological surveillance and outbreak forecasting assistant.\n\nHow can I help you today? You can ask me to evaluate disease clusters, analyze growth trends, calculate reproduction speeds (R₀), or project future outbreak windows in English, தமிழ் (Tamil), or Tanglish.\n\n---FOLLOW_UPS---\nSummarize current outbreak status\nWhich district is highest risk?\nWhat pathogen is spreading fastest?`;
+  }
 
   const primaryDisease = diseases[0]?.name || 'Dengue';
   const primaryZone = zones[0]?.name || 'Chennai';
@@ -222,6 +241,9 @@ CRITICAL LANGUAGE & SYSTEM RULES:
 2. DO NOT ACT AS A DOCTOR. Do NOT provide personal medical diagnosis, triage advice, or individual drug prescriptions.
 3. DO NOT GENERATE FAKE DATA. Only explain information derived from the provided dataset and platform analytics.
 4. Explain dataset trends, predictions, alerts, and district risks clearly so public health authorities, researchers, and judges can evaluate them easily.
+6. WORK AS A NORMAL CONVERSATIONAL ASSISTANT:
+   - If the user sends greetings (e.g. 'hello', 'hi', 'vanakkam', 'வணக்கம்', 'how are you', 'who are you', 'thanks'), respond naturally and warmly to the greeting first, introduce yourself as OUTBREAKX AI Copilot, and offer helpful guidance.
+   - Answer general questions about disease prevention, vector control, epidemiological metrics, or platform usage smoothly and conversationally.
 5. Provide 3 relevant follow-up questions at the very end in the SAME language, formatted exactly as:
 ---FOLLOW_UPS---
 [First follow-up question]

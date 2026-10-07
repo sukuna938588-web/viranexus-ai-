@@ -67,8 +67,8 @@ export const Overview: React.FC<OverviewProps> = ({
         <Globe3D
           totalRecords={totalCases}
           r0={estimatedR0}
-          topDisease={topDiseases[0]?.name || 'Dengue'}
-          topLocation={topZones[0]?.name || 'Chennai'}
+          topDisease={topDiseases[0]?.name}
+          topLocation={topZones[0]?.name}
           locations={topZones.map((z) => ({
             name: z.name,
             cases: z.count,
@@ -171,7 +171,9 @@ export const Overview: React.FC<OverviewProps> = ({
         </div>
         <div>
           <span className="text-slate-400 text-[10px] uppercase">Transmission Speed</span>
-          <div className="text-lg font-black text-purple-300 mt-0.5">R₀ = {estimatedR0}</div>
+          <div className="text-lg font-black text-purple-300 mt-0.5">
+            {records.length > 0 ? `R₀ = ${estimatedR0}` : '--'}
+          </div>
         </div>
         <div>
           <span className="text-slate-400 text-[10px] uppercase">Active Alerts</span>

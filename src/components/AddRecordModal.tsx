@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { X, Plus, AlertCircle, Sparkles, CheckCircle2 } from 'lucide-react';
+import { X, Plus, AlertCircle, Sparkles, CheckCircle2, MapPin, Compass } from 'lucide-react';
 import { OutbreakRecord, SeverityLevel, GenderType } from '../types';
+import { InteractiveLocationPickerModal } from './InteractiveLocationPickerModal';
+import { DISTRICT_COORDINATES } from '../services/csvService';
 
 interface AddRecordModalProps {
   isOpen: boolean;
@@ -40,6 +42,10 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
 }) => {
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
   const [region, setRegion] = useState('Chennai');
+  const [latitude, setLatitude] = useState<number | undefined>(13.0827);
+  const [longitude, setLongitude] = useState<number | undefined>(80.2707);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
+
   const [disease, setDisease] = useState('Dengue');
   const [age, setAge] = useState<number>(25);
   const [sex, setSex] = useState<GenderType>('Male');
@@ -54,7 +60,10 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
   useEffect(() => {
     if (initialData) {
       setDate(initialData.date || new Date().toISOString().split('T')[0]);
-      setRegion(initialData.region || initialData.district || 'Chennai');
+      const reg = initialData.region || initialData.district || 'Chennai';
+      setRegion(reg);
+      setLatitude(initialData.latitude || DISTRICT_COORDINATES[reg]?.lat || 13.0827);
+      setLongitude(initialData.longitude || DISTRICT_COORDINATES[reg]?.lng || 80.2707);
       setDisease(initialData.disease || 'Dengue');
       setAge(initialData.age || 25);
       setSex(initialData.sex || 'Male');
@@ -68,6 +77,8 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
     } else if (isOpen) {
       setDate(new Date().toISOString().split('T')[0]);
       setRegion('Chennai');
+      setLatitude(13.0827);
+      setLongitude(80.2707);
       setDisease('Dengue');
       setAge(25);
       setSex('Male');
@@ -97,6 +108,12 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
     setSymptoms(parsed);
   };
 
+  const handleLocationPicked = (loc: { region: string; latitude: number; longitude: number }) => {
+    setRegion(loc.region);
+    setLatitude(loc.latitude);
+    setLongitude(loc.longitude);
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!region.trim()) {
@@ -119,10 +136,16 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
 
     const finalSymptoms = symptoms.length > 0 ? symptoms : ['Fever', 'Body Pain'];
 
+    // Fallback coordinates if unset
+    const finalLat = latitude || DISTRICT_COORDINATES[region.trim()]?.lat || 13.0827;
+    const finalLng = longitude || DISTRICT_COORDINATES[region.trim()]?.lng || 80.2707;
+
     onSave({
       date,
       region: region.trim(),
       district: region.trim(),
+      latitude: finalLat,
+      longitude: finalLng,
       disease: disease.trim(),
       age,
       ageGroup,
@@ -138,232 +161,268 @@ export const AddRecordModal: React.FC<AddRecordModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
-      <div className="relative w-full max-w-xl rounded-3xl bg-[#090d1a] border border-cyan-500/30 p-6 sm:p-7 shadow-2xl text-slate-100 my-6 animate-fade-in">
-        {/* Header */}
-        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
-              <h2 className="text-lg font-black text-white font-mono tracking-wide">
-                {initialData ? 'Edit Surveillance Record' : 'Manual Dataset Record Entry'}
-              </h2>
-            </div>
-            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
-              Standard 10-Column OutbreakX Schema: Date, Region / Zone, Disease, Age / Sex, Severity, Symptoms, Cases, Deaths, Recovered
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        {error && (
-          <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
-            <AlertCircle className="w-4 h-4 shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs font-mono">
-          {/* Row 1: Date & Region / Zone */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+    <>
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+        <div className="relative w-full max-w-xl rounded-3xl bg-[#090d1a] border border-cyan-500/30 p-6 sm:p-7 shadow-2xl text-slate-100 my-6 animate-fade-in">
+          {/* Header */}
+          <div className="flex items-center justify-between pb-4 border-b border-slate-800">
             <div>
-              <label className="text-slate-300 block mb-1 font-bold">1. Date</label>
-              <input
-                type="date"
-                value={date}
-                onChange={(e) => setDate(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-            </div>
-
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">2. Region / Zone</label>
-              <input
-                type="text"
-                list="region-presets"
-                placeholder="e.g. Chennai, Madurai"
-                value={region}
-                onChange={(e) => setRegion(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-              <datalist id="region-presets">
-                {COMMON_REGIONS.map((r) => (
-                  <option key={r} value={r} />
-                ))}
-              </datalist>
-            </div>
-          </div>
-
-          {/* Row 2: Disease & Severity */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">3. Disease</label>
-              <input
-                type="text"
-                list="disease-presets"
-                placeholder="e.g. Dengue, Influenza A"
-                value={disease}
-                onChange={(e) => setDisease(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-                required
-              />
-              <datalist id="disease-presets">
-                {COMMON_DISEASES.map((d) => (
-                  <option key={d} value={d} />
-                ))}
-              </datalist>
-            </div>
-
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">5. Severity</label>
-              <select
-                value={severity}
-                onChange={(e) => setSeverity(e.target.value as SeverityLevel)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-              >
-                <option value="Normal">Normal</option>
-                <option value="Moderate">Moderate</option>
-                <option value="Severe">Severe</option>
-                <option value="Critical">Critical</option>
-              </select>
-            </div>
-          </div>
-
-          {/* Row 3: Age & Sex (Age / Sex) */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-[#060914] border border-slate-800/80">
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <label className="text-slate-300 font-bold">4a. Age (Years)</label>
-                <span className="text-[10px] text-cyan-400">Example: 25, 42, 12</span>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-ping" />
+                <h2 className="text-lg font-black text-white font-mono tracking-wide">
+                  {initialData ? 'Edit Surveillance Record' : 'Manual Dataset Record Entry'}
+                </h2>
               </div>
-              <input
-                type="number"
-                min="1"
-                max="120"
-                value={age}
-                onChange={(e) => setAge(Number(e.target.value) || 25)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-                required
-              />
+              <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                Standard 10-Column OutbreakX Schema: Date, Region / Zone, Disease, Age / Sex, Severity, Symptoms, Cases, Deaths, Recovered
+              </p>
             </div>
-
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">4b. Sex</label>
-              <select
-                value={sex}
-                onChange={(e) => setSex(e.target.value as GenderType)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-              >
-                <option value="Male">Male</option>
-                <option value="Female">Female</option>
-                <option value="Other">Other</option>
-              </select>
-              <span className="text-[10px] text-slate-500 mt-1 block">
-                Formatted as: <strong className="text-cyan-300">{age} / {sex}</strong>
-              </span>
-            </div>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          {/* Row 4: Symptoms with Quick Chips */}
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <label className="text-slate-300 font-bold">6. Symptoms (Multiple supported)</label>
-              <span className="text-[10px] text-slate-500">Click to toggle common symptom</span>
+          {error && (
+            <div className="mt-3 flex items-center gap-2 p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-300 text-xs font-mono">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              <span>{error}</span>
             </div>
+          )}
 
-            <div className="flex flex-wrap gap-1.5 mb-2">
-              {COMMON_SYMPTOMS.map((sym) => {
-                const active = symptoms.includes(sym);
-                return (
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="mt-4 space-y-4 text-xs font-mono">
+            {/* Row 1: Date & Region / Zone */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">1. Date</label>
+                <input
+                  type="date"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                  required
+                />
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold">2. Region / Zone</label>
                   <button
                     type="button"
-                    key={sym}
-                    onClick={() => toggleSymptom(sym)}
-                    className={`px-2.5 py-1 rounded-lg border text-[11px] transition font-medium ${
-                      active
-                        ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm shadow-cyan-500/10'
-                        : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
-                    }`}
+                    onClick={() => setIsPickerOpen(true)}
+                    className="flex items-center gap-1 text-[11px] font-bold text-cyan-400 hover:text-cyan-300 underline"
                   >
-                    {active ? '✓ ' : '+ '}{sym}
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>Choose Location on Map</span>
                   </button>
-                );
-              })}
+                </div>
+                <input
+                  type="text"
+                  list="region-presets"
+                  placeholder="e.g. Chennai, Madurai"
+                  value={region}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setRegion(val);
+                    if (DISTRICT_COORDINATES[val]) {
+                      setLatitude(DISTRICT_COORDINATES[val].lat);
+                      setLongitude(DISTRICT_COORDINATES[val].lng);
+                    }
+                  }}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                  required
+                />
+                <datalist id="region-presets">
+                  {COMMON_REGIONS.map((r) => (
+                    <option key={r} value={r} />
+                  ))}
+                </datalist>
+
+                {latitude && longitude && (
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-[10px] mt-1.5 animate-fade-in">
+                    <CheckCircle2 className="w-3 h-3 text-cyan-400 shrink-0" />
+                    <span>GPS Coordinates: {latitude.toFixed(4)}° N, {longitude.toFixed(4)}° E</span>
+                  </div>
+                )}
+              </div>
             </div>
 
-            <input
-              type="text"
-              placeholder="e.g. Fever, Headache, Body Pain"
-              value={symptomInput}
-              onChange={(e) => handleSymptomInputChange(e.target.value)}
-              className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
-            />
-          </div>
+            {/* Row 2: Disease & Severity */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">3. Disease</label>
+                <input
+                  type="text"
+                  list="disease-presets"
+                  placeholder="e.g. Dengue, Influenza A"
+                  value={disease}
+                  onChange={(e) => setDisease(e.target.value)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                  required
+                />
+                <datalist id="disease-presets">
+                  {COMMON_DISEASES.map((d) => (
+                    <option key={d} value={d} />
+                  ))}
+                </datalist>
+              </div>
 
-          {/* Row 5: Cases, Deaths, Recovered */}
-          <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">5. Severity</label>
+                <select
+                  value={severity}
+                  onChange={(e) => setSeverity(e.target.value as SeverityLevel)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="Normal">Normal</option>
+                  <option value="Moderate">Moderate</option>
+                  <option value="Severe">Severe</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Row 3: Age & Sex (Age / Sex) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 rounded-2xl bg-[#060914] border border-slate-800/80">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-slate-300 font-bold">4a. Age (Years)</label>
+                  <span className="text-[10px] text-cyan-400">Example: 25, 42, 12</span>
+                </div>
+                <input
+                  type="number"
+                  min="1"
+                  max="120"
+                  value={age}
+                  onChange={(e) => setAge(Number(e.target.value) || 25)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">4b. Sex</label>
+                <select
+                  value={sex}
+                  onChange={(e) => setSex(e.target.value as GenderType)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                >
+                  <option value="Male">Male</option>
+                  <option value="Female">Female</option>
+                  <option value="Other">Other</option>
+                </select>
+                <span className="text-[10px] text-slate-500 mt-1 block">
+                  Formatted as: <strong className="text-cyan-300">{age} / {sex}</strong>
+                </span>
+              </div>
+            </div>
+
+            {/* Row 4: Symptoms with Quick Chips */}
             <div>
-              <label className="text-slate-300 block mb-1 font-bold">7. Cases</label>
+              <div className="flex items-center justify-between mb-1.5">
+                <label className="text-slate-300 font-bold">6. Symptoms (Multiple supported)</label>
+                <span className="text-[10px] text-slate-500">Click to toggle common symptom</span>
+              </div>
+
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {COMMON_SYMPTOMS.map((sym) => {
+                  const active = symptoms.includes(sym);
+                  return (
+                    <button
+                      type="button"
+                      key={sym}
+                      onClick={() => toggleSymptom(sym)}
+                      className={`px-2.5 py-1 rounded-lg border text-[11px] transition font-medium ${
+                        active
+                          ? 'bg-cyan-500/20 text-cyan-300 border-cyan-500/50 shadow-sm shadow-cyan-500/10'
+                          : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700'
+                      }`}
+                    >
+                      {active ? '✓ ' : '+ '}{sym}
+                    </button>
+                  );
+                })}
+              </div>
+
               <input
-                type="number"
-                min="1"
-                value={cases}
-                onChange={(e) => setCases(Number(e.target.value) || 1)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-                required
+                type="text"
+                placeholder="e.g. Fever, Headache, Body Pain"
+                value={symptomInput}
+                onChange={(e) => handleSymptomInputChange(e.target.value)}
+                className="w-full px-3 py-2 rounded-xl bg-slate-900/90 border border-slate-800 text-white placeholder-slate-500 focus:outline-none focus:border-cyan-500/50"
               />
             </div>
 
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">8. Deaths</label>
-              <input
-                type="number"
-                min="0"
-                value={deaths}
-                onChange={(e) => setDeaths(Number(e.target.value) || 0)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-              />
+            {/* Row 5: Cases, Deaths, Recovered */}
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">7. Cases</label>
+                <input
+                  type="number"
+                  min="1"
+                  value={cases}
+                  onChange={(e) => setCases(Number(e.target.value) || 1)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">8. Deaths</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={deaths}
+                  onChange={(e) => setDeaths(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
+
+              <div>
+                <label className="text-slate-300 block mb-1 font-bold">9. Recovered</label>
+                <input
+                  type="number"
+                  min="0"
+                  value={recovered}
+                  onChange={(e) => setRecovered(Number(e.target.value) || 0)}
+                  className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="text-slate-300 block mb-1 font-bold">9. Recovered</label>
-              <input
-                type="number"
-                min="0"
-                value={recovered}
-                onChange={(e) => setRecovered(Number(e.target.value) || 0)}
-                className="w-full px-3 py-2 rounded-xl bg-slate-900 border border-slate-800 text-white focus:outline-none focus:border-cyan-500/50"
-              />
+            {/* Actions */}
+            <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-mono transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs font-mono shadow-lg shadow-cyan-500/25 active:scale-95 transition"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{initialData ? 'Update Record' : 'Save Record'}</span>
+              </button>
             </div>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-slate-800">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-300 hover:bg-slate-800 text-xs font-mono transition"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="flex items-center gap-1.5 px-6 py-2.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs font-mono shadow-lg shadow-cyan-500/25 active:scale-95 transition"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>{initialData ? 'Update Record' : 'Save Record'}</span>
-            </button>
-          </div>
-        </form>
+          </form>
+        </div>
       </div>
-    </div>
+
+      {/* Interactive Map Location Picker Drawer */}
+      <InteractiveLocationPickerModal
+        isOpen={isPickerOpen}
+        onClose={() => setIsPickerOpen(false)}
+        onSelectLocation={handleLocationPicked}
+        initialLat={latitude || 13.0827}
+        initialLng={longitude || 80.2707}
+        initialRegion={region || 'Chennai'}
+      />
+    </>
   );
 };

@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "maplibre-gl/dist/maplibre-gl.css";
 
 @layer base {
   body {
@@ -23,4 +24,123 @@
   ::-webkit-scrollbar-thumb:hover {
     background: #334155;
   }
+}
+
+/* Futuristic Healthcare Animations & Effects */
+@keyframes pulseWave {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+  50% {
+    transform: scale(1.05);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+}
+
+@keyframes radarSweep {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes dnaTwist {
+  0%, 100% {
+    transform: translateY(0px) scale(1);
+  }
+  50% {
+    transform: translateY(-8px) scale(1.1);
+  }
+}
+
+@keyframes markerRipple {
+  0% {
+    transform: scale(0.5);
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(2.8);
+    opacity: 0;
+  }
+}
+
+.animate-pulse-wave {
+  animation: pulseWave 3s ease-in-out infinite;
+}
+
+.animate-radar-sweep {
+  animation: radarSweep 4s linear infinite;
+}
+
+.animate-dna {
+  animation: dnaTwist 4s ease-in-out infinite;
+}
+
+/* MapLibre GL Dark Command Center Overrides */
+.maplibregl-map {
+  background: #05070d !important;
+  font-family: 'JetBrains Mono', monospace, monospace !important;
+}
+
+.maplibregl-canvas {
+  outline: none;
+}
+
+.maplibregl-ctrl-group {
+  background: #080d1a !important;
+  border: 1px solid rgba(6, 182, 212, 0.3) !important;
+  border-radius: 14px !important;
+  overflow: hidden;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.7) !important;
+}
+
+.maplibregl-ctrl-group button {
+  background: #080d1a !important;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.8) !important;
+  color: #38bdf8 !important;
+}
+
+.maplibregl-ctrl-group button:hover {
+  background: #0e172a !important;
+}
+
+.maplibregl-popup-content {
+  background: #080d1a !important;
+  color: #f1f5f9 !important;
+  border: 1px solid rgba(6, 182, 212, 0.4) !important;
+  border-radius: 18px !important;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8), 0 0 25px rgba(6, 182, 212, 0.2) !important;
+  backdrop-filter: blur(16px) !important;
+  padding: 14px !important;
+}
+
+.maplibregl-popup-anchor-top .maplibregl-popup-tip {
+  border-bottom-color: #080d1a !important;
+}
+.maplibregl-popup-anchor-bottom .maplibregl-popup-tip {
+  border-top-color: #080d1a !important;
+}
+.maplibregl-popup-anchor-left .maplibregl-popup-tip {
+  border-right-color: #080d1a !important;
+}
+.maplibregl-popup-anchor-right .maplibregl-popup-tip {
+  border-left-color: #080d1a !important;
+}
+
+/* Custom Marker CSS ripple */
+.marker-beacon-ripple {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 9999px;
+  animation: markerRipple 2.2s cubic-bezier(0.1, 0.7, 0.3, 1) infinite;
+  pointer-events: none;
 }

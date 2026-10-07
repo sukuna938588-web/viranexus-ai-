@@ -10,6 +10,7 @@ import {
   ShieldCheck,
   FileSpreadsheet,
   Activity,
+  Crosshair,
 } from 'lucide-react';
 import { EpidemiologicalIntelligence, OutbreakRecord, ActivePage } from '../types';
 
@@ -18,6 +19,13 @@ interface PredictionCenterProps {
   records: OutbreakRecord[];
   onSelectPage: (page: ActivePage) => void;
   onLoadSample: () => void;
+  onFocusPrediction?: (pred: {
+    location: string;
+    disease?: string;
+    probability?: number;
+    timeWindow?: string;
+    explanation?: string;
+  }) => void;
 }
 
 export const PredictionCenter: React.FC<PredictionCenterProps> = ({
@@ -25,6 +33,7 @@ export const PredictionCenter: React.FC<PredictionCenterProps> = ({
   records,
   onSelectPage,
   onLoadSample,
+  onFocusPrediction,
 }) => {
   const [forecastHorizon, setForecastHorizon] = useState<7 | 30>(7);
 
@@ -111,22 +120,54 @@ export const PredictionCenter: React.FC<PredictionCenterProps> = ({
             </div>
 
             <div className="flex items-center gap-2">
-              <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold uppercase">
+              <span className="px-3 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono font-bold uppercase hidden sm:inline-block">
                 Primary Threat Vector
               </span>
+              <button
+                onClick={() => {
+                  const targetDistrict =
+                    prediction.affectedDistricts[0] ||
+                    records[0]?.region ||
+                    records[0]?.district ||
+                    '';
+                  if (targetDistrict && onFocusPrediction) {
+                    onFocusPrediction({
+                      location: targetDistrict,
+                      disease: prediction.disease,
+                      probability: prediction.probability,
+                      timeWindow: prediction.timeWindow,
+                      explanation: prediction.explanation,
+                    });
+                  }
+                  onSelectPage('map');
+                }}
+                className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs font-mono shadow-lg shadow-cyan-500/25 active:scale-95 transition"
+              >
+                <Crosshair className="w-3.5 h-3.5" />
+                <span>View On Map</span>
+              </button>
             </div>
           </div>
 
           {/* 3 Metric Pills */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {/* Probability % */}
+            {/* Probability % & Confidence */}
             <div className="p-5 rounded-2xl bg-[#05070e] border border-cyan-500/30 space-y-1">
               <div className="text-[11px] font-mono uppercase text-slate-400 flex items-center justify-between">
-                <span>Probability</span>
-                <span className="text-cyan-400 font-bold">Confidence</span>
+                <span>Surge Probability</span>
+                <span className="text-cyan-400 font-bold">
+                  {prediction.confidence ? `${prediction.confidence}% Confidence` : 'Empirical CI'}
+                </span>
               </div>
-              <div className="text-3xl font-black text-cyan-400 font-mono">
-                {prediction.probability}%
+              <div className="flex items-baseline gap-2">
+                <div className="text-3xl font-black text-cyan-400 font-mono">
+                  {prediction.probability}%
+                </div>
+                {prediction.confidence && (
+                  <span className="text-[11px] font-mono text-cyan-200/70">
+                    ({prediction.confidence}% Confidence)
+                  </span>
+                )}
               </div>
               <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden mt-2">
                 <div
@@ -172,13 +213,26 @@ export const PredictionCenter: React.FC<PredictionCenterProps> = ({
             </div>
             <div className="flex flex-wrap gap-2">
               {prediction.affectedDistricts.map((district) => (
-                <div
+                <button
                   key={district}
-                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 text-xs font-mono text-white font-semibold shadow-sm"
+                  onClick={() => {
+                    if (onFocusPrediction) {
+                      onFocusPrediction({
+                        location: district,
+                        disease: prediction.disease,
+                        probability: prediction.probability,
+                        timeWindow: prediction.timeWindow,
+                        explanation: prediction.explanation,
+                      });
+                    }
+                    onSelectPage('map');
+                  }}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-slate-900 border border-slate-700 hover:border-cyan-500/50 text-xs font-mono text-white font-semibold shadow-sm transition active:scale-95 group"
                 >
-                  <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                  <MapPin className="w-3.5 h-3.5 text-rose-400 group-hover:scale-110 transition-transform" />
                   <span>{district}</span>
-                </div>
+                  <span className="text-[10px] text-cyan-400 opacity-80 group-hover:opacity-100">&bull; View on Map</span>
+                </button>
               ))}
             </div>
           </div>
@@ -193,6 +247,19 @@ export const PredictionCenter: React.FC<PredictionCenterProps> = ({
               {prediction.explanation}
             </p>
           </div>
+
+          {/* Growth Trend Explanation based on date, disease, region, cases, deaths and recovery trends */}
+          {prediction.growthTrendExplanation && (
+            <div className="p-5 rounded-2xl bg-[#05070e] border border-cyan-500/25 space-y-2">
+              <div className="flex items-center gap-2 text-xs font-mono font-bold text-cyan-300 uppercase tracking-wider">
+                <TrendingUp className="w-3.5 h-3.5 text-cyan-400" />
+                Growth Trend & Historical Velocity Explanation
+              </div>
+              <p className="text-xs text-slate-300 font-mono leading-relaxed">
+                {prediction.growthTrendExplanation}
+              </p>
+            </div>
+          )}
         </div>
       </div>
 

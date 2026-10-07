@@ -14,6 +14,7 @@ import {
   FileSpreadsheet,
   UploadCloud,
   CheckCircle2,
+  Crosshair,
 } from 'lucide-react';
 import { EpidemiologicalIntelligence, OutbreakRecord, ActivePage } from '../types';
 
@@ -23,6 +24,13 @@ interface DashboardProps {
   onSelectPage: (page: ActivePage) => void;
   onOpenAddModal: () => void;
   onLoadSample: () => void;
+  onFocusPrediction?: (pred: {
+    location: string;
+    disease?: string;
+    probability?: number;
+    timeWindow?: string;
+    explanation?: string;
+  }) => void;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -31,6 +39,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onSelectPage,
   onOpenAddModal,
   onLoadSample,
+  onFocusPrediction,
 }) => {
   const {
     totalCases,
@@ -259,13 +268,34 @@ export const Dashboard: React.FC<DashboardProps> = ({
                 {prediction.explanation}
               </p>
 
-              <button
-                onClick={() => onSelectPage('prediction')}
-                className="flex items-center gap-2 text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold transition group"
-              >
-                <span>Open Full Prediction Center & Detailed Breakdown</span>
-                <ArrowRight className="w-3.5 h-3.5 group-hover:translate-x-1 transition" />
-              </button>
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-slate-800/60">
+                <button
+                  onClick={() => {
+                    const targetLoc = prediction.affectedDistricts[0] || 'Chennai';
+                    if (onFocusPrediction) {
+                      onFocusPrediction({
+                        location: targetLoc,
+                        disease: prediction.disease,
+                        probability: prediction.probability,
+                        timeWindow: prediction.timeWindow,
+                        explanation: prediction.explanation,
+                      });
+                    }
+                    onSelectPage('map');
+                  }}
+                  className="flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-slate-950 font-black text-xs font-mono shadow-md shadow-cyan-500/20 active:scale-95 transition"
+                >
+                  <Crosshair className="w-3.5 h-3.5" />
+                  <span>View On Map</span>
+                </button>
+
+                <button
+                  onClick={() => onSelectPage('prediction')}
+                  className="flex items-center gap-1.5 text-xs font-mono text-cyan-400 hover:text-cyan-300 font-bold transition group"
+                >
+                  <span>Prediction Center &rarr;</span>
+                </button>
+              </div>
             </div>
           </div>
 

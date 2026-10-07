@@ -24,6 +24,13 @@ export default function App() {
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<OutbreakRecord | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [focusedPrediction, setFocusedPrediction] = useState<{
+    location: string;
+    disease?: string;
+    probability?: number;
+    timeWindow?: string;
+    explanation?: string;
+  } | null>(null);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -121,6 +128,7 @@ export default function App() {
                 onSelectPage={setCurrentPage}
                 onOpenAddModal={handleOpenAddModal}
                 onLoadSample={handleLoadSample}
+                onFocusPrediction={setFocusedPrediction}
               />
             )}
 
@@ -132,6 +140,8 @@ export default function App() {
                 onSelectPage={setCurrentPage}
                 onLoadSample={handleLoadSample}
                 onOpenAddModal={handleOpenAddModal}
+                focusedPrediction={focusedPrediction}
+                onClearFocusedPrediction={() => setFocusedPrediction(null)}
               />
             )}
 
@@ -151,6 +161,7 @@ export default function App() {
                 records={records}
                 onSelectPage={setCurrentPage}
                 onLoadSample={handleLoadSample}
+                onFocusPrediction={setFocusedPrediction}
               />
             )}
 

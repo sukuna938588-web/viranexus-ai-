@@ -154,22 +154,48 @@ export const AICopilot: React.FC<AICopilotProps> = ({
 
   function generateClientFallback(question: string, intel: EpidemiologicalIntelligence): string {
     const isTamil = /[\u0B80-\u0BFF]/.test(question);
-    const isTanglish = /\b(yen|aguthu|aaguthu|eppadi|irukku|la|panrathu|solunga)\b/i.test(question);
+    const isTanglish = /\b(yen|aguthu|aaguthu|eppadi|irukku|la|panrathu|solunga|vanakkam|vanakam|epdi|neenga|yaaru|nandri)\b/i.test(question);
 
-    const primaryDisease = intel.topDiseases[0]?.name || 'Dengue';
-    const primaryZone = intel.topZones[0]?.name || 'Chennai';
+    const norm = question.trim().toLowerCase();
+    const isGreeting =
+      /^(hi|hello|hey|vanakkam|vanakam|வணக்கம்|காலை வணக்கம்|மாலை வணக்கம்|epdi irukinga|how are you|who are you|neenga yaaru|who r u|what can you do|good morning|good evening|good afternoon|nandri|thanks|thank you|நன்றி|bye|goodbye|help)(\s*[!?.])?$/i.test(
+        norm
+      ) || /\b(how are you|who are you|neenga yaaru|epdi irukinga|what are you)\b/i.test(norm);
+
+    if (isGreeting) {
+      if (isTamil) {
+        return `வணக்கம்! நான் **OUTBREAKX AI Copilot**, உங்கள் நோய் கண்காணிப்பு மற்றும் தொற்று கணிப்பு AI ஆலோசகர்.\n\nநான் உங்களுக்கு எவ்வாறு உதவ முடியும்? பதிவேற்றப்பட்ட தரவுகளின் அடிப்படையில் மாவட்ட அபாயங்கள், பரவல் வேகம் (R₀), மற்றும் எதிர்கால கணிப்புகளைப் பற்றி நீங்கள் என்னிடம் கேட்கலாம்.\n\n---FOLLOW_UPS---\nதற்போதைய தொற்று நிலவரத்தை சுருக்கமாகக் கூறுக\nஎந்த மாவட்டத்தில் அதிக ஆபத்து உள்ளது?\nஅடுத்த வாரம் பரவல் எப்படி இருக்கும்?`;
+      }
+      if (isTanglish) {
+        return `Vanakkam! Naan **OUTBREAKX AI Copilot**, ungaloda disease surveillance and outbreak prediction assistant.\n\nNaan ungalukku eppadi help panna mudiyum? Ungaloda dataset analysis, high-risk districts, and future outbreak predictions pathi enkitta keka mudiyum!\n\n---FOLLOW_UPS---\nCurrent outbreak status short ah solunga\nEndha district la risk athigama irukku?\nNext week outbreak eppadi irukkum?`;
+      }
+      return `Hello! I am **OUTBREAKX AI Copilot**, your intelligent epidemiological surveillance and outbreak forecasting assistant.\n\nHow can I help you today? You can ask me to evaluate cluster risks, analyze pathogen growth trends, calculate reproduction speeds (R₀), or project future contagion windows in English, தமிழ் (Tamil), or Tanglish.\n\n---FOLLOW_UPS---\nSummarize current outbreak status\nWhich district is highest risk?\nWhat pathogen is spreading fastest?`;
+    }
+
+    if (records.length === 0) {
+      if (isTamil) {
+        return `இன்னும் கண்காணிப்பு தரவுகள் எதுவும் பதிவேற்றப்படவில்லை. நிகழ்நேர தொற்று பகுப்பாய்வு மற்றும் கணிப்புகளைப் பெற தயவுசெய்து ஒரு CSV கோப்பைப் பதிவேற்றவும் அல்லது "Add Record" மூலம் புதிய வழக்கைச் சேர்க்கவும்.\n\n---FOLLOW_UPS---\nமாதிரி தரவுத்தொகுப்பை எவ்வாறு ஏற்றுவது?\nOUTBREAKX எவ்வாறு நோய்களைக் கணிக்கிறது?\nCSV கோப்பை எவ்வாறு பதிவேற்றுவது?`;
+      }
+      if (isTanglish) {
+        return `Innum dataset ethuvum upload pannala. Real-time outbreak analytics and predictions paaka CSV file upload pannunga or "Add Record" click panni case add pannunga.\n\n---FOLLOW_UPS---\nSample dataset eppadi load panrathu?\nOUTBREAKX eppadi disease predict pannuthu?\nCSV upload panna enna columns theva?`;
+      }
+      return `No surveillance dataset is loaded currently. Please upload a CSV file in Dataset Management or add records to calculate real-time disease telemetry and predictive forecasts.\n\n---FOLLOW_UPS---\nHow do I upload a surveillance dataset?\nWhat columns are required in the CSV?\nHow does OUTBREAKX predict upcoming outbreaks?`;
+    }
+
+    const primaryDisease = intel.topDiseases[0]?.name || records[0]?.disease || 'Target Pathogen';
+    const primaryZone = intel.topZones[0]?.name || records[0]?.region || 'Monitored Sector';
     const r0 = intel.estimatedR0 || 1.1;
     const gRate = intel.growthRatePct || 0;
 
     if (isTamil) {
-      return `பதிவேற்றப்பட்ட தரவுகளின்படி, **${primaryZone}** மாவட்டத்தில் **${primaryDisease}** பாதிப்புகள் தொடர்ந்து அதிகரித்து வருகின்றன (வாராந்திர வளர்ச்சி: +${gRate}%, பரவல் வேகம் R₀ = ${r0}). உடனடி கொசு ஒழிப்பு மருந்து தெளித்தல் மற்றும் ஆரம்பக்கட்ட மருத்துவ பரிசோதனை முகாம்களை அமைக்க அறிவுறுத்தப்படுகிறது.\n\n---FOLLOW_UPS---\n${primaryZone} மாவட்டத்தில் அடுத்த வார நிலை என்ன?\nதடுப்பு நடவடிக்கைகள் என்னென்ன எடுக்க வேண்டும்?\nஅதிக ஆபத்துள்ள பிற மாவட்டங்கள் யாவை?`;
+      return `பதிவேற்றப்பட்ட தரவுகளின்படி, **${primaryZone}** பகுதியில் **${primaryDisease}** வழக்குகள் தீவிரமாக கண்காணிக்கப்பட்டு வருகின்றன (வாராந்திர வளர்ச்சி: ${gRate >= 0 ? '+' : ''}${gRate}%, பரவல் வேகம் R₀ = ${r0}). ஆரம்பக்கட்ட மருத்துவ பரிசோதனை முகாம்களை அமைக்க அறிவுறுத்தப்படுகிறது.\n\n---FOLLOW_UPS---\n${primaryZone} மாவட்டத்தில் அடுத்த வார நிலை என்ன?\nதடுப்பு நடவடிக்கைகள் என்னென்ன எடுக்க வேண்டும்?\nஅதிக ஆபத்துள்ள பிற பகுதிகள் யாவை?`;
     }
 
     if (isTanglish) {
-      return `Upload pannuna surveillance dataset analysis padi, **${primaryZone} la ${primaryDisease}** cases continuous ah increase aaguthu. Weekly growth +${gRate}% irukku, transmission speed R₀ = ${r0}. Water stagnation clear panni fogging spray panrathu romba important!\n\n---FOLLOW_UPS---\nNext week cases count eppadi irukkum?\n${primaryZone} la enna precautions edukalame?\nOther high risk districts edhulam?`;
+      return `Upload pannuna surveillance dataset analysis padi, **${primaryZone} la ${primaryDisease}** cases continuous ah increase aaguthu. Weekly growth ${gRate >= 0 ? '+' : ''}${gRate}% irukku, transmission speed R₀ = ${r0}. Water stagnation clear panni preventive fogging panrathu romba important!\n\n---FOLLOW_UPS---\nNext week cases count eppadi irukkum?\n${primaryZone} la enna precautions edukalame?\nOther high risk districts edhulam?`;
     }
 
-    return `Based on verified surveillance data, **${primaryDisease}** is exhibiting rapid acceleration in **${primaryZone}** (Weekly growth: +${gRate}%, Transmission velocity R₀ = ${r0}). Early containment advisories and active screening should be prioritized.\n\n---FOLLOW_UPS---\nWhich neighboring districts are at risk?\nWhat is the expected outbreak timeframe?\nWhat clinical directives are recommended?`;
+    return `Based on verified surveillance data, **${primaryDisease}** is exhibiting rapid acceleration in **${primaryZone}** (Weekly growth: ${gRate >= 0 ? '+' : ''}${gRate}%, Transmission velocity R₀ = ${r0}). Early containment advisories and active screening should be prioritized.\n\n---FOLLOW_UPS---\nWhich neighboring districts are at risk?\nWhat is the expected outbreak timeframe?\nWhat clinical directives are recommended?`;
   }
 
   const handleCopyMessage = (text: string, id: string) => {
